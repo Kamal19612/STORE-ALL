@@ -1,0 +1,574 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@keyframes whatsapp-blink {
+  0%, 49% { opacity: 1;    box-shadow: 0 0 12px 4px #25D36680; }
+  50%, 100% { opacity: 0.25; box-shadow: none; }
+}
+
+.btn-whatsapp-blink {
+  animation: whatsapp-blink 0.9s step-end infinite;
+}
+
+@theme {
+  /* Custom color palette - mapped to :root variables */
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-secondary: var(--secondary);
+  --color-secondary-light: var(--secondary-light);
+  --color-accent-soft: var(--accent-soft);
+
+  /* Custom animations */
+  --animate-bounce-scale: bounce-scale 0.3s ease-in-out;
+  @keyframes bounce-scale {
+
+    0%,
+    100% {
+      transform: scale(1);
+    }
+
+    50% {
+      transform: scale(1.2);
+    }
+  }
+
+  --animate-pulse-fast: pulse-fast 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  @keyframes pulse-fast {
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.5;
+    }
+  }
+}
+
+:root {
+  /* Custom color palette from PHP index.php - Source of Truth */
+  --primary: #f5ad41;
+  --primary-dark: #d89a35;
+  --secondary: #242021;
+  --secondary-light: #3a3638;
+  --accent-soft: #fdf2e2;
+}
+
+body {
+  @apply bg-gray-50 text-secondary antialiased transition-colors duration-300;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    "Noto Sans",
+    sans-serif,
+    "Apple Color Emoji",
+    "Segoe UI Emoji",
+    "Segoe UI Symbol",
+    "Noto Color Emoji";
+}
+
+:root.dark body {
+  background-color: #1c191a;
+  /* Darker Charbon for depth */
+  color: #f5f5f5;
+}
+
+/* Typographie Spécifique Logo (Serif pour l'élégance) */
+.font-brand-serif {
+  font-family: "Playfair Display", serif;
+}
+
+/* Carte Produit - Style Premium */
+.product-card {
+  @apply transition-all duration-200 ease-out bg-white rounded-lg shadow-md overflow-hidden relative;
+}
+
+.product-card:hover {
+  @apply -translate-y-1 shadow-xl;
+  box-shadow: 0 10px 20px rgba(242, 33, 33, 0.15);
+}
+
+/* Boutons Gradués Premium */
+.btn-primary {
+  @apply bg-primary hover:bg-primary-dark text-secondary font-bold py-2 px-4 rounded-lg transition-colors duration-300;
+}
+
+.btn-secondary {
+  @apply bg-secondary hover:bg-secondary-light text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300;
+}
+
+/* Badge Panier Amélioré */
+.cart-badge {
+  @apply absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-xs font-bold text-white shadow-sm animate-bounce-scale;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded-full hover:bg-gray-400;
+}
+
+:root.dark ::-webkit-scrollbar-thumb {
+  @apply bg-gray-600 hover:bg-gray-500;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* GLOBAL DARK MODE OVERRIDES */
+:root.dark h1,
+:root.dark h2,
+:root.dark h3,
+:root.dark h4,
+:root.dark h5,
+:root.dark h6 {
+  color: #f5f5f5;
+}
+
+:root.dark p,
+:root.dark span,
+:root.dark div {
+  color: #e0e0e0;
+}
+
+/* Tables Dark Mode */
+:root.dark table {
+  background-color: #242021;
+  /* Dark brand color */
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+:root.dark thead {
+  background-color: #1c191a;
+  color: #f5ad41;
+  /* Gold Accent */
+}
+
+:root.dark th,
+:root.dark td {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+:root.dark tr:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Inputs & Forms Dark Mode */
+:root.dark input,
+:root.dark select,
+:root.dark textarea {
+  background-color: #242021;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #f5f5f5;
+}
+
+:root.dark input:focus,
+:root.dark select:focus,
+:root.dark textarea:focus {
+  border-color: #f5ad41;
+  --tw-ring-color: #f5ad41;
+}
+
+/* Card Backgrounds in Dark Mode (Generic) */
+:root.dark .bg-white {
+  background-color: #242021;
+}
+
+:root.dark .text-gray-800,
+:root.dark .text-gray-700,
+:root.dark .text-gray-600 {
+  color: #e0e0e0;
+}
+
+/* Global Toastify Overrides */
+.Toastify__toast {
+  background-color: white !important;
+  color: #333 !important;
+  font-weight: bold !important;
+  border: 1px solid #ddd !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+  border-radius: 8px !important;
+}
+
+.Toastify__toast-body {
+  font-family: inherit;
+}
+
+.Toastify__progress-bar {
+  background: var(--primary) !important;
+}
+
+.Toastify__close-button {
+  color: #999 !important;
+}
+
+/* Responsive Toastify — mobile */
+@media (max-width: 480px) {
+  .Toastify__toast-container {
+    width: calc(100% - 32px) !important;
+    left: 16px !important;
+    right: 16px !important;
+    top: 72px !important;
+    padding: 0 !important;
+  }
+
+  .Toastify__toast-container--top-right {
+    top: 72px !important;
+    right: 16px !important;
+  }
+
+  .Toastify__toast {
+    margin-bottom: 8px !important;
+    border-radius: 10px !important;
+  }
+}
+
+/* Dark mode overrides for Toastify */
+:root.dark .Toastify__toast {
+  background-color: #242021 !important;
+  color: #f5f5f5 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+:root.dark .Toastify__close-button {
+  color: #f5f5f5 !important;
+}
+
+/* ============================================
+   TEXT SLIDER STYLES (Mobile Version)
+   ============================================ */
+
+.text-slider-indicator {
+  transition: all 0.3s ease;
+}
+
+.text-slider-indicator.active {
+  background-color: var(--primary);
+  width: 2rem;
+  border-radius: 9999px;
+}
+
+/* Dark mode support for TextSlider */
+:root.dark .text-slider-container {
+  background: linear-gradient(135deg, rgba(245, 173, 65, 0.05) 0%, rgba(245, 173, 65, 0.02) 100%);
+  border-color: rgba(245, 173, 65, 0.15);
+}
+
+
+/* ============================================
+   TABLET & MOBILE OPTIMIZATIONS (max-width: 768px)
+   Override desktop styles for small screens
+   ============================================ */
+
+@media (max-width: 768px) {
+
+  /* ========== CAROUSEL FIXES ========== */
+  /* Replica exacte du style desktop mais avec hauteur adaptive pour mobile */
+  .slider-container {
+    width: 100% !important;
+    height: auto !important;
+    aspect-ratio: auto !important;
+    min-height: 200px !important;
+    max-height: 60vh !important;
+    overflow: hidden !important;
+    margin-bottom: 1rem !important;
+    background-color: #f3f4f6 !important;
+    border-radius: 0.5rem !important;
+  }
+
+  /* Force override du h-[400px] Tailwind */
+  div[className*="slider-container"] {
+    height: auto !important;
+    aspect-ratio: auto !important;
+    min-height: 200px !important;
+    max-height: 60vh !important;
+  }
+
+  .slider-container img,
+  .slider-container div img,
+  .hero-carousel img,
+  .hero-carousel div img {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 60vh !important;
+    object-fit: contain !important;
+    object-position: center !important;
+    display: block !important;
+    background-color: transparent !important;
+  }
+
+  /* ========== PRODUCT GRID FIXES ========== */
+  /* Product Grid - Responsive columns based on screen width */
+  @supports (display: grid) {
+    .grid.grid-cols-1.lg\:grid-cols-4,
+    .catalog-product-grid:not(.ali-catalog-product-grid):not(.bs-catalog-product-grid) {
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+      gap: 0.75rem !important;
+      grid-auto-flow: dense;
+    }
+
+    .vitrine-alibaba .ali-catalog-product-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      gap: 0.75rem !important;
+    }
+
+    .vitrine-brandsama .bs-catalog-product-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      gap: 0.75rem !important;
+    }
+  }
+
+  /* Alternative grid for sm:grid-cols-2 breakpoint */
+  @supports (display: grid) {
+    .grid.sm\:grid-cols-2.lg\:grid-cols-4 {
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+      gap: 0.75rem !important;
+      grid-auto-flow: dense;
+    }
+  }
+
+  /* ========== PRODUCT CARD IMAGE FIXES ========== */
+  /* Product Cards - Optimize spacing */
+  .product-card {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  /* Product Image Container - ratio carré, suit la largeur de colonne */
+  .product-card__media,
+  .product-card>div:first-child {
+    aspect-ratio: 1 / 1 !important;
+    height: auto !important;
+    overflow: hidden !important;
+    flex-shrink: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Product Image - remplit le conteneur */
+  .product-card__image,
+  .product-card img {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    object-fit: cover !important;
+    object-position: center !important;
+    display: block !important;
+  }
+
+  /* Product Info Container */
+  .product-card>div:last-child {
+    padding: 0.5rem !important;
+    flex-grow: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+  }
+
+  .product-card p {
+    font-size: 0.7rem !important;
+    padding: 0 !important;
+    margin: 0.25rem 0 !important;
+  }
+
+  .product-card h3 {
+    font-size: 0.8rem !important;
+    line-height: 1.2 !important;
+    margin: 0.25rem 0 !important;
+  }
+
+  /* Buttons - Ensure touch-friendly size */
+  .product-card button {
+    min-height: 40px !important;
+    min-width: 40px !important;
+    padding: 0.5rem !important;
+    font-size: 0.8rem !important;
+  }
+
+  /* Page padding - Reduce for mobile (sauf vitrine Alibaba, géré dans alibaba-theme.css) */
+  .max-w-7xl:not(.ali-storefront-page) {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+
+  /* Admin Grids - Force single column on mobile (forms/settings only) */
+  .grid.md\:grid-cols-2,
+  .grid.md\:grid-cols-3 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Reduce gaps for mobile grids */
+  .gap-6 {
+    gap: 1rem !important;
+  }
+
+  .gap-8 {
+    gap: 1rem !important;
+  }
+
+  /* Admin table - Improve mobile responsiveness */
+  table {
+    font-size: 0.75rem !important;
+  }
+
+  table th,
+  table td {
+    padding: 0.5rem !important;
+  }
+
+  /* Hide non-essential columns on mobile */
+  table th:nth-child(3),
+  table td:nth-child(3),
+  table th:nth-child(5),
+  table td:nth-child(5) {
+    display: none !important;
+  }
+
+  /* Form inputs - better mobile sizing */
+  input[type="text"],
+  input[type="email"],
+  input[type="number"],
+  input[type="date"],
+  select,
+  textarea {
+    font-size: 16px !important;
+    min-height: 44px !important;
+  }
+
+  /* Generic cards - prevent image overflow (exclude product grid thumbnails) */
+  .rounded-lg>img,
+  .overflow-hidden:not(.slider-container):not(aside):not(.product-card):not(.product-card__media) img,
+  .product-card .slider-container img {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+  }
+
+  .mb-6 {
+    margin-bottom: 1rem !important;
+  }
+
+  /* Title styling for mobile */
+  h1 {
+    font-size: 1.875rem !important;
+  }
+
+  /* Generic cards - prevent image overflow (exclude storefront carousels + header logos + product cards) */
+  .rounded-lg>img,
+  .overflow-hidden:not(.slider-container):not(.hero-carousel):not(.product-card):not(.product-card__media) img,
+  .bg-white:not(.ali-header):not(.product-card) img,
+  .bg-white img:not(.ali-header__logo):not(.ali-footer__logo):not(.product-card__image) {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+  }
+
+  /* Ensure flex containers stack properly on mobile (exclude aside/sidebar) */
+  .flex.flex-col:not(aside) {
+    width: 100% !important;
+  }
+
+  /* Header mobile optimization */
+  header {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+
+  /* Sidebar toggle and header spacing */
+  .px-4 {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+}
+
+/* ============================================
+   DESKTOP OPTIMIZATIONS (min-width: 769px)
+   Restore full desktop styles
+   ============================================ */
+
+@media (min-width: 769px) {
+
+  /* Carousel — hauteur adaptée à l'image (pas de crop) */
+  .slider-container,
+  .hero-carousel.slider-container {
+    height: auto !important;
+    max-height: none !important;
+    background-color: #f3f4f6;
+  }
+
+  .slider-container img,
+  .slider-container div img,
+  .hero-carousel.slider-container img {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 400px !important;
+    object-fit: contain !important;
+    object-position: center !important;
+  }
+
+  /* Product Cards - image suit la largeur de la colonne (carré) */
+  .product-card__media,
+  .product-card>div:first-child {
+    aspect-ratio: 1 / 1 !important;
+    height: auto !important;
+    width: 100% !important;
+  }
+
+  .product-card__image,
+  .product-card img {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    object-fit: cover !important;
+    object-position: center !important;
+  }
+}
+
+/* Grille produits — vignettes carrées, priorité sur toutes les règles génériques */
+.product-card .product-card__media {
+  position: relative;
+  aspect-ratio: 1 / 1 !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0;
+  flex-shrink: 0;
+  overflow: hidden;
+  background-color: transparent !important;
+}
+
+.product-card .product-card__image {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  display: block !important;
+}

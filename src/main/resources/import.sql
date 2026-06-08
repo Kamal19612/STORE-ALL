@@ -1,0 +1,3 @@
+-- Hibernate n'exécute import.sql qu'avec ddl-auto create / create-drop (pas avec update).
+-- Rôles staff : SUPER_ADMIN | MANAGER — assainissement au boot : LegacyUserRoleMigrator ;
+-- hors ligne : scripts/normalize-user-roles.sql

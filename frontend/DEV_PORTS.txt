@@ -1,0 +1,16 @@
+Ports STORE-ALL (développement local)
+=====================================
+
+- Frontend Vite (npm run frontend / npm run dev / npm run dev:h2) : 5176
+  → URL staff : http://localhost:5176/login
+  → strictPort: activé dans vite.config.js — un seul serveur Vite à la fois.
+    Si « Port 5176 is in use » : arrêter l’autre instance (autre terminal) ou :
+      fuser -k 5176/tcp
+
+- API Spring Boot : 8085
+  → Proxifiée par Vite sous /api et /uploads (pas besoin de CORS en dev).
+
+- Prévisualisation build (npm run frontend:prod) : 4273
+
+Important : ne pas mélanger http://localhost:5176 et :5177 — ce sont deux
+« sites » différents ; le token reste dans localStorage par origine.

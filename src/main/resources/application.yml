@@ -1,0 +1,105 @@
+spring:
+  devtools:
+    restart:
+      enabled: false
+  task:
+    scheduling:
+      pool:
+        size: 8
+  datasource:
+    # Source unique : Postgres Supabase local STORE-ALL (db.port=5634 dans supabase/config.toml).
+    # Surcharge explicite uniquement via DB_JDBC_URL ou DB_HOST/DB_PORT/DB_NAME (scripts/load-supabase-env.sh).
+    url: ${DB_JDBC_URL:jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5634}/${DB_NAME:postgres}}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        "[format_sql]": true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-me}
+    expiration: 604800000
+
+  whatsapp-number: ${APP_WHATSAPP_NUMBER:22607065363}
+  store-name: ${APP_STORE_NAME:STORE-ALL}
+  store-phone: ${APP_STORE_PHONE:+226 XX XX XX XX}
+
+  storage:
+    location: "uploads"
+
+  bootstrap:
+    admin-username: admin
+    admin-email: admin@store-all.local
+    admin-password: "${STORE_ALL_ADMIN_PASSWORD:${SPIRIT_ADMIN_PASSWORD:Pass_word.(1)@!}}"
+    reset-admin-password-on-each-start: ${STORE_ALL_RESET_ADMIN_EACH_START:${SPIRIT_RESET_ADMIN_EACH_START:true}}
+    seed-delivery-settings-on-start: true
+    delivery-settings-store-code: ${STORE_ALL_DELIVERY_STORE_CODE:spirit}
+
+  telegram:
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+    chat-id: ${TELEGRAM_CHAT_ID:}
+    webhook-url: ${TELEGRAM_WEBHOOK_URL:}
+    webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:}
+
+  webpush:
+    vapid-public-key: ${WEBPUSH_VAPID_PUBLIC_KEY:}
+    vapid-private-key: ${WEBPUSH_VAPID_PRIVATE_KEY:}
+    vapid-subject: ${WEBPUSH_VAPID_SUBJECT:}
+
+  supabase:
+    url: ${SUPABASE_URL:}
+    service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
+
+  delivery:
+    webhook-hmac-secret: ${DELIVERY_WEBHOOK_HMAC_SECRET:}
+    fcm:
+      enabled: ${FCM_ENABLED:false}
+      service-account-path: ${FCM_SERVICE_ACCOUNT_PATH:}
+      project-id: ${FCM_PROJECT_ID:}
+
+google:
+  sheets:
+    application-name: "STORE-ALL API"
+    credentials-file-path: ${GOOGLE_SHEETS_CREDENTIALS_PATH:${GOOGLE_APPLICATION_CREDENTIALS:classpath:credentials.json}}
+    spreadsheet-id: ""
+    sync-rate: 60000
+    sync-initial-delay: 15000
+    product-import-mode: ${GOOGLE_SHEETS_PRODUCT_IMPORT_MODE:auto}
+    http-connect-timeout-ms: 15000
+    http-read-timeout-ms: 120000
+
+orders:
+  sheets:
+    sync-rate: 60000
+    sync-initial-delay: 45000
+
+tenant:
+  default-store-code: spirit
+  host-label-to-store-code:
+    sucrestore: sucre
+    spiritstore: spirit
+
+server:
+  port: ${SERVER_PORT:8085}
+  shutdown: immediate
+  forward-headers-strategy: framework
+
+logging:
+  file:
+    name: logs/store-all-api.log
+  logback:
+    rollingpolicy:
+      max-file-size: 20MB
+      total-size-cap: 500MB
+      max-history: 14

@@ -1,0 +1,105 @@
+/**
+ * Optimisations CSS pour améliorer les performances
+ */
+
+/* Force le GPU à gérer les transformations et les opacités */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+/* Optimisation des scrollbars personnalisées */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Optimisation du rendu des images */
+img {
+  content-visibility: auto;
+}
+
+/* Désactiver les animations pour les utilisateurs qui préfèrent réduire le mouvement */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Optimisation pour mobile - Réduire les backdrop-blur coûteux */
+@media (max-width: 768px) {
+  .mobile-no-blur {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Simplifier les ombres sur mobile */
+  .shadow-2xl,
+  .shadow-xl {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  }
+
+  /* Réduire le blur sur mobile */
+  .blur-\[80px\] {
+    filter: blur(40px) !important;
+  }
+}
+
+/* Optimisation du scroll sur mobile */
+@media (max-width: 768px) {
+  .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* Performance hint pour les navigateurs */
+.animate-on-scroll {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px;
+}
+
+/* Optimisation du rendu des listes longues */
+.virtual-list-item {
+  content-visibility: auto;
+  contain: layout style paint;
+}
+
+/* Réduire le coût des gradients sur mobile */
+@media (max-width: 768px) {
+  [class*="bg-gradient-"] {
+    background-image: none !important;
+  }
+}
+
+/* Optimiser les transitions pour mobile */
+@media (max-width: 768px) {
+  * {
+    transition-duration: 150ms !important;
+  }
+}
+
+/* Améliorer la performance des cartes avec beaucoup de contenu */
+.card-optimized {
+  contain: layout style;
+  content-visibility: auto;
+}
+
+/* Forcer l'accélération matérielle pour certains éléments */
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}

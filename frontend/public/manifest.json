@@ -1,0 +1,24 @@
+{
+  "id": "/store",
+  "name": "STORE",
+  "short_name": "STORE",
+  "description": "STORE — Boutique en ligne (STORE-ALL)",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f5ad41",
+  "icons": [
+    {
+      "src": "/logo-store.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo-store.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

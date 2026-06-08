@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="STORE">
+  <defs>
+    <linearGradient id="storeFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff8ec"/>
+      <stop offset="55%" stop-color="#f5ad41"/>
+      <stop offset="100%" stop-color="#c77d1a"/>
+    </linearGradient>
+    <linearGradient id="storeShine" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="30" fill="url(#storeFace)"/>
+  <path fill="url(#storeShine)" d="M24 24h80v40L64 104 24 64Z" opacity="0.9"/>
+  <path fill="#3d2914" fill-opacity="0.88" d="M64 28 96 52v40L64 100 32 92V52Z"/>
+  <path fill="#f5ad41" d="m64 40 22 18v28L64 88 42 86V58Z"/>
+  <path fill="#3d2914" fill-opacity="0.25" d="M64 40v48l-22-2V58Z"/>
+</svg>

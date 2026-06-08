@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:store_all_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;NON_KEYWORDS=KEY,VALUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+app:
+  jwt:
+    secret: test-secret-change-me
+    expiration: 604800000
+  bootstrap:
+    # Tests H2 : même garde-fous qu'en prod (UPDATE + CHECK).
+    normalize-legacy-user-roles-on-start: true
+    enforce-user-role-check-constraint: true
+
+server:
+  port: 0
+

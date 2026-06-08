@@ -1,23 +1,67 @@
-### AL ###
-#Template for AL projects for Dynamics 365 Business Central
-#launch.json folder
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
 .vscode/
-#Cache folder
-.alcache/
-#Symbols folder
-.alpackages/
-#Snapshots folder
-.snapshots/
-#Testing Output folder
-.output/
-#Extension App-file
-*.app
-#Rapid Application Development File
-rad.json
-#Translation Base-file
-*.g.xlf
-#License-files
-*.bclicense
-*.flf
-#Test results file
-TestResults.xml
+
+### Google Credentials ###
+credentials.json
+src/main/resources/credentials.json
+ node_modules/
+ frontend/node_modules/
+
+### Env local ###
+supabase/.env
+frontend/.env
+
+### Logs & runtime ###
+*.log
+logs/
+.store-all-run/
+nohup.out
+
+### Build / cache frontend ###
+frontend/dist/
+frontend/.vite/
+
+### Uploads locaux (médias produits) ###
+uploads/
+
+### Supabase CLI ###
+supabase/.temp/
+
+### IDE / agents (hors app) ###
+.agents/
+.claude/
+skills-lock.json
+
+### Fichiers backup ###
+*.bak

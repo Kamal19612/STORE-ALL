@@ -1,0 +1,18 @@
+# Profil OPTIONNEL — base H2 en mémoire (données perdues à chaque arrêt, PAS la base store_all).
+# Uniquement : npm run dev:h2 ou mvn spring-boot:run -Pdev-h2 -Dspring-boot.run.profiles=dev-h2
+# Pour la base unique Postgres (5634) : npm run dev (profil par défaut + load-supabase-env.sh).
+spring:
+  datasource:
+    url: jdbc:h2:mem:store_local;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;NON_KEYWORDS=KEY,VALUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+server:
+  port: ${SERVER_PORT:8085}

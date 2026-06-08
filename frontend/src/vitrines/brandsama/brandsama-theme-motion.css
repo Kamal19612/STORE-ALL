@@ -1,0 +1,264 @@
+/**
+ * Animations Brandsama — style professionnel (transitions sobres, pas d’effet 3D).
+ * Courbes Material, apparitions en fondu, micro-interactions discrètes.
+ */
+
+.vitrine-brandsama {
+  --bs-ease-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --bs-ease-in-out: cubic-bezier(0.4, 0, 0.6, 1);
+  --bs-duration-fast: 0.2s;
+  --bs-duration-normal: 0.32s;
+  --bs-duration-slow: 0.5s;
+}
+
+/* ─── Entrée de page ─── */
+.vitrine-brandsama .bs-hero-content {
+  animation: bs-fade-in-up 0.65s var(--bs-ease-out) both;
+  animation-delay: 0.08s;
+}
+
+.vitrine-brandsama .bs-layout {
+  animation: bs-fade-in 0.45s var(--bs-ease-out) both;
+  animation-delay: 0.12s;
+}
+
+.vitrine-brandsama .bs-hero-overlay {
+  animation: bs-hero-overlay-breathe 14s var(--bs-ease-in-out) infinite alternate;
+}
+
+@keyframes bs-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bs-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bs-hero-overlay-breathe {
+  from {
+    opacity: 0.92;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ─── Header : ombre légère au repos, renforcée au survol des liens ─── */
+.vitrine-brandsama .bs-header {
+  transition: box-shadow var(--bs-duration-normal) var(--bs-ease-out);
+  box-shadow: 0 1px 0 var(--bs-border);
+}
+
+.vitrine-brandsama .bs-search-input,
+.vitrine-brandsama .bs-btn-ghost,
+.vitrine-brandsama .bs-btn-primary,
+.vitrine-brandsama .bs-sidebar-item,
+.vitrine-brandsama .bs-mcat__tab {
+  transition:
+    background-color var(--bs-duration-fast) var(--bs-ease-out),
+    border-color var(--bs-duration-fast) var(--bs-ease-out),
+    color var(--bs-duration-fast) var(--bs-ease-out),
+    box-shadow var(--bs-duration-fast) var(--bs-ease-out),
+    transform var(--bs-duration-fast) var(--bs-ease-out),
+    opacity var(--bs-duration-fast) var(--bs-ease-out);
+}
+
+.vitrine-brandsama .bs-search-input:focus {
+  box-shadow: 0 0 0 3px rgba(88, 97, 242, 0.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vitrine-brandsama .bs-sidebar-item:hover,
+  .vitrine-brandsama .bs-mcat__tab:hover {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vitrine-brandsama .bs-mcat__selection {
+    transition: none !important;
+  }
+}
+
+/* ─── Grille produits : apparition décalée (stagger) ─── */
+.vitrine-brandsama .bs-product-grid .bs-card.product-card {
+  animation: bs-card-enter var(--bs-duration-slow) var(--bs-ease-out) both;
+}
+
+.vitrine-brandsama .bs-product-grid .bs-card.product-card:nth-child(1) {
+  animation-delay: 0.03s;
+}
+.vitrine-brandsama .bs-product-grid .bs-card.product-card:nth-child(2) {
+  animation-delay: 0.06s;
+}
+.vitrine-brandsama .bs-product-grid .bs-card.product-card:nth-child(3) {
+  animation-delay: 0.09s;
+}
+.vitrine-brandsama .bs-product-grid .bs-card.product-card:nth-child(4) {
+  animation-delay: 0.12s;
+}
+.vitrine-brandsama .bs-product-grid .bs-card.product-card:nth-child(5) {
+  animation-delay: 0.15s;
+}
+.vitrine-brandsama .bs-product-grid .bs-card.product-card:nth-child(6) {
+  animation-delay: 0.18s;
+}
+.vitrine-brandsama .bs-product-grid .bs-card.product-card:nth-child(7) {
+  animation-delay: 0.21s;
+}
+.vitrine-brandsama .bs-product-grid .bs-card.product-card:nth-child(8) {
+  animation-delay: 0.24s;
+}
+.vitrine-brandsama .bs-product-grid .bs-card.product-card:nth-child(n + 9) {
+  animation-delay: 0.27s;
+}
+
+@keyframes bs-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Survol carte : élévation plate (sans inclinaison) */
+.vitrine-brandsama .bs-card.product-card {
+  transition:
+    transform var(--bs-duration-normal) var(--bs-ease-out),
+    box-shadow var(--bs-duration-normal) var(--bs-ease-out),
+    border-color var(--bs-duration-fast) var(--bs-ease-out);
+}
+
+.vitrine-brandsama .bs-card.product-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(88, 97, 242, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.vitrine-brandsama .bs-card-image-img {
+  transition: transform 0.4s var(--bs-ease-out);
+}
+
+.vitrine-brandsama .bs-card.product-card:hover .bs-card-image-img {
+  transform: scale(1.04);
+}
+
+/* Évite que le zoom de la carte grille déborde pendant la modale */
+body.bs-modal-open .vitrine-brandsama .bs-card.product-card:hover .bs-card-image-img {
+  transform: none;
+}
+
+body.bs-modal-open .vitrine-brandsama .bs-card.product-card:hover {
+  transform: none;
+  box-shadow: var(--bs-shadow-1);
+}
+
+.vitrine-brandsama .bs-card-detail-btn {
+  transition: opacity var(--bs-duration-fast) var(--bs-ease-out);
+}
+
+.vitrine-brandsama .bs-section-title {
+  animation: bs-fade-in-up 0.5s var(--bs-ease-out) both;
+}
+
+/* ─── Boutons : feedback discret ─── */
+.vitrine-brandsama .bs-btn-primary:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.vitrine-brandsama .bs-card-cart-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+/* ─── Modals & panier ─── */
+.vitrine-brandsama .cart-drawer-root .cart-drawer-overlay {
+  animation: bs-overlay-in 0.28s var(--bs-ease-out) both;
+}
+
+.vitrine-brandsama .cart-drawer {
+  animation: bs-drawer-in 0.36s var(--bs-ease-out) both;
+}
+
+/* Modale détail produit — même survol que le thème classique */
+#bs-details-modal {
+  animation: bs-overlay-in 0.28s var(--bs-ease-out) both;
+}
+
+#bs-details-modal .bs-details-panel {
+  animation: bs-modal-in 0.34s var(--bs-ease-out) both;
+}
+
+@keyframes bs-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bs-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes bs-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.vitrine-brandsama .checkout-page .checkout-panel {
+  transition: box-shadow var(--bs-duration-normal) var(--bs-ease-out);
+}
+
+.vitrine-brandsama .checkout-page .checkout-panel:focus-within {
+  box-shadow: 0 4px 20px rgba(88, 97, 242, 0.1);
+}
+
+/* ─── Accessibilité ─── */
+@media (prefers-reduced-motion: reduce) {
+  .vitrine-brandsama .bs-hero-content,
+  .vitrine-brandsama .bs-layout,
+  .vitrine-brandsama .bs-hero-overlay,
+  .vitrine-brandsama .bs-product-grid .bs-card.product-card,
+  .vitrine-brandsama .bs-section-title,
+  .vitrine-brandsama .cart-drawer-root .cart-drawer-overlay,
+  .vitrine-brandsama .cart-drawer,
+  #bs-details-modal,
+  #bs-details-modal .bs-details-panel {
+    animation: none;
+  }
+
+  .vitrine-brandsama .bs-card.product-card:hover,
+  .vitrine-brandsama .bs-card.product-card:hover .bs-card-image-img,
+  .vitrine-brandsama .bs-btn-primary:not(:disabled):active,
+  .vitrine-brandsama .bs-card-cart-btn:active:not(:disabled) {
+    transform: none;
+  }
+}
