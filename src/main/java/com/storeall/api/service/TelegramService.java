@@ -780,9 +780,23 @@ public class TelegramService {
         sb.append("📋 N° : <code>").append(escapeHtml(order.getOrderNumber())).append("</code>\n");
         sb.append("👤 Client : ").append(escapeHtml(order.getCustomerName())).append("\n");
         sb.append("📞 Tel : ").append(escapeHtml(order.getCustomerPhone())).append("\n");
-        sb.append("📍 Adresse : ").append(escapeHtml(order.getCustomerAddress())).append("\n");
 
-        if (order.getDeliveryType() != null) {
+        if (order.isPickup()) {
+            sb.append("🏪 Mode : <b>Retrait en boutique</b>\n");
+            Long sid = resolveOrderStoreId(order);
+            if (sid != null && storeRepository != null) {
+                storeRepository.findById(sid)
+                    .map(Store::getMapsUrl)
+                    .filter(v -> v != null && !v.isBlank())
+                    .ifPresent(maps -> sb.append("🗺 <a href=\"")
+                        .append(escapeHtml(maps.trim()))
+                        .append("\">Lieu de retrait</a>\n"));
+            }
+        } else {
+            sb.append("📍 Adresse : ").append(escapeHtml(order.getCustomerAddress())).append("\n");
+        }
+
+        if (!order.isPickup() && order.getDeliveryType() != null) {
             String typeLabel = switch (order.getDeliveryType()) {
                 case "EXPRESS" -> "⚡ Express";
                 case "PROGRAMMER" -> "🕐 Programmée";
@@ -795,12 +809,14 @@ public class TelegramService {
             sb.append("\n");
         }
 
-        if (order.getCustomerLatitude() != null && order.getCustomerLongitude() != null) {
-            sb.append("🗺 <a href=\"https://www.google.com/maps?q=")
-              .append(order.getCustomerLatitude()).append(",").append(order.getCustomerLongitude())
-              .append("\">Voir sur Maps</a>\n");
-        } else if (order.getManualLocationLink() != null && !order.getManualLocationLink().isBlank()) {
-            sb.append("🗺 <a href=\"").append(escapeHtml(order.getManualLocationLink())).append("\">Voir sur Maps</a>\n");
+        if (!order.isPickup()) {
+            if (order.getCustomerLatitude() != null && order.getCustomerLongitude() != null) {
+                sb.append("🗺 <a href=\"https://www.google.com/maps?q=")
+                  .append(order.getCustomerLatitude()).append(",").append(order.getCustomerLongitude())
+                  .append("\">Voir sur Maps</a>\n");
+            } else if (order.getManualLocationLink() != null && !order.getManualLocationLink().isBlank()) {
+                sb.append("🗺 <a href=\"").append(escapeHtml(order.getManualLocationLink())).append("\">Voir sur Maps</a>\n");
+            }
         }
 
         if (order.getCustomerNotes() != null && !order.getCustomerNotes().isBlank()) {

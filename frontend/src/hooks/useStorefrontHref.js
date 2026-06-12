@@ -20,7 +20,9 @@ export function useStorefrontHref() {
       base,
       /** Accueil boutique */
       home: base,
-      /** Page checkout */
+      /** Choix livraison / retrait avant checkout */
+      fulfillment: `${base}/commande`,
+      /** Page checkout (livraison) */
       checkout: `${base}/checkout`,
       cart: `${base}/cart`,
       products: `${base}/products`,

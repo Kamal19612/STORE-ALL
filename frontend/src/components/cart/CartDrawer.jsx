@@ -5,7 +5,7 @@ import { useStorefrontHref } from "../../hooks/useStorefrontHref";
 import ProductImage from "../product/ProductImage";
 
 const CartDrawer = ({ isOpen, onClose }) => {
-  const { checkout: checkoutHref } = useStorefrontHref();
+  const { fulfillment: fulfillmentHref } = useStorefrontHref();
   const { items, removeItem, updateQuantity } = useCartStore();
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const total = items.reduce(
@@ -139,7 +139,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                 </span>
               </div>
               <p className="text-xs text-gray-400 italic">
-                Frais de livraison calculés lors de la commande.
+                Livraison ou retrait en boutique — choix à l&apos;étape suivante.
               </p>
 
               <button
@@ -149,7 +149,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
                   document.body.scrollTop = 0;
                   document.documentElement.scrollTop = 0;
-                  navigate(checkoutHref);
+                  navigate(fulfillmentHref);
                 }}
                 className="cart-drawer-cta btn-primary w-full py-3 text-lg font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2 tracking-wide"
               >

@@ -81,6 +81,33 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Page<Order> findByStatusAndDeliveryAgentNullAndDeletedFalse(Order.Status status, Pageable pageable);
 
     /**
+     * Commandes livraison uniquement (exclut retrait boutique) — pool livreurs.
+     */
+    @EntityGraph(attributePaths = {"store"})
+    @Query("""
+        SELECT o FROM Order o
+        WHERE o.status = :status
+          AND o.deliveryAgent IS NULL
+          AND o.deleted = false
+          AND (o.fulfillmentType IS NULL OR o.fulfillmentType = com.storeall.api.entity.FulfillmentType.DELIVERY)
+        """)
+    Page<Order> findDeliveryAvailableByStatus(@Param("status") Order.Status status, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"store"})
+    @Query("""
+        SELECT o FROM Order o
+        WHERE o.status = :status
+          AND o.deliveryAgent IS NULL
+          AND o.deleted = false
+          AND o.store.id = :storeId
+          AND (o.fulfillmentType IS NULL OR o.fulfillmentType = com.storeall.api.entity.FulfillmentType.DELIVERY)
+        """)
+    Page<Order> findDeliveryAvailableByStatusAndStore_Id(
+        @Param("status") Order.Status status,
+        @Param("storeId") Long storeId,
+        Pageable pageable);
+
+    /**
      * Trouve les commandes par statut (utilisé par le bot Telegram).
      */
     List<Order> findTop10ByStatusOrderByIdDesc(Order.Status status);

@@ -71,6 +71,7 @@ import ManifestSwitcher from "./components/ManifestSwitcher";
 // Pages - Code Splitting (Lazy Load)
 const StorefrontVitrinePage = lazyWithRetry(() => import("./components/storefront/StorefrontVitrinePage"));
 const Checkout = lazyWithRetry(() => import("./pages/public/Checkout"));
+const OrderFulfillment = lazyWithRetry(() => import("./pages/public/OrderFulfillment"));
 const Login = lazyWithRetry(() => import("./pages/Login"));
 
 // Admin Pages
@@ -299,6 +300,7 @@ function App() {
                     </div>
                   }
                 />
+                <Route path="commande" element={<OrderFulfillment />} />
                 <Route path="checkout" element={<Checkout />} />
               </Route>
             </Route>

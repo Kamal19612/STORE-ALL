@@ -91,6 +91,14 @@ const AdminOrderList = () => {
     }
   };
 
+  const getFulfillmentLabel = (order) =>
+    order.fulfillmentType === "PICKUP" ? "Retrait" : "Livraison";
+
+  const getFulfillmentColor = (order) =>
+    order.fulfillmentType === "PICKUP"
+      ? "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300 border border-teal-100 dark:border-teal-900/50"
+      : "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/50";
+
   const getStatusLabel = (status) => {
     const labels = {
       PENDING: "En attente",
@@ -141,13 +149,18 @@ const AdminOrderList = () => {
               key={order.id}
               className="bg-white dark:bg-[#242021] rounded-lg shadow-sm border border-gray-100 dark:border-white/10 p-3 sm:p-4"
             >
-              <div className="flex justify-between items-start mb-2">
+              <div className="flex justify-between items-start mb-2 gap-2">
                 <span className="font-bold text-gray-900 dark:text-white text-sm sm:text-base">
                   #{order.orderNumber}
                 </span>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                  {getStatusLabel(order.status)}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                    {getStatusLabel(order.status)}
+                  </span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${getFulfillmentColor(order)}`}>
+                    {getFulfillmentLabel(order)}
+                  </span>
+                </div>
               </div>
               <div className="text-sm font-medium text-gray-900 dark:text-white mb-1">
                 {order.customerName}
@@ -193,6 +206,7 @@ const AdminOrderList = () => {
                 <th className="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Client</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">Code</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Total</th>
+                <th className="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Mode</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Statut</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase text-right">Actions</th>
               </tr>
@@ -214,6 +228,11 @@ const AdminOrderList = () => {
                     ) : <span className="text-xs text-gray-400">-</span>}
                   </td>
                   <td className="px-4 py-3 font-bold text-primary dark:text-primary-400 text-sm">{order.total.toLocaleString()} FCA</td>
+                  <td className="px-4 py-3 hidden sm:table-cell">
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getFulfillmentColor(order)}`}>
+                      {getFulfillmentLabel(order)}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                       {getStatusLabel(order.status)}

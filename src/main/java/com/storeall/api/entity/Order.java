@@ -106,7 +106,15 @@ public class Order {
     private BigDecimal customerLongitude;
 
     /**
-     * Type de livraison (STANDARD, EXPRESS, PROGRAMMER)
+     * Mode de commande : livraison ({@link FulfillmentType#DELIVERY}) ou retrait boutique ({@link FulfillmentType#PICKUP}).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "fulfillment_type", length = 20)
+    @Builder.Default
+    private FulfillmentType fulfillmentType = FulfillmentType.DELIVERY;
+
+    /**
+     * Type de livraison (STANDARD, EXPRESS, PROGRAMMER) — uniquement si {@link #fulfillmentType} = DELIVERY.
      */
     @Column(length = 20)
     private String deliveryType;
@@ -206,4 +214,14 @@ public class Order {
     @jakarta.persistence.ManyToOne
     @jakarta.persistence.JoinColumn(name = "delivery_agent_id")
     private User deliveryAgent;
+
+    /** {@code true} si la commande est à retirer en boutique (pas de livreur). */
+    public boolean isPickup() {
+        return fulfillmentType == FulfillmentType.PICKUP;
+    }
+
+    /** {@code true} si la commande nécessite une livraison (y compris anciennes lignes sans {@code fulfillment_type}). */
+    public boolean isDelivery() {
+        return fulfillmentType == null || fulfillmentType == FulfillmentType.DELIVERY;
+    }
 }

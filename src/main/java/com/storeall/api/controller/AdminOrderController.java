@@ -80,6 +80,18 @@ public class AdminOrderController {
     }
 
     /**
+     * POST /api/manager/{storeId}/orders/{id}/complete-pickup
+     * Body: { "code": "1234" } — valide le retrait boutique (CONFIRMED → DELIVERED).
+     */
+    @PostMapping("/{id}/complete-pickup")
+    public ResponseEntity<Order> completePickup(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> payload) {
+        String code = payload != null ? payload.get("code") : null;
+        return ResponseEntity.ok(orderService.completePickup(id, code));
+    }
+
+    /**
      * GET /api/admin/orders/{id}/history : Récupère l'historique des
      * changements de statut
      */

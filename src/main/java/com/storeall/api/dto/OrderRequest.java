@@ -22,10 +22,13 @@ public class OrderRequest {
     @NotBlank(message = "Le téléphone est obligatoire")
     private String customerPhone; // WhatsApp number
 
-    @NotBlank(message = "L'adresse est obligatoire")
+    /** Obligatoire pour {@code DELIVERY} ; ignorée pour {@code PICKUP} (défaut côté serveur). */
     private String customerAddress;
 
     private String customerNotes;
+
+    /** {@code DELIVERY} (défaut) ou {@code PICKUP}. */
+    private String fulfillmentType;
     private BigDecimal customerLatitude;
     private BigDecimal customerLongitude;
 

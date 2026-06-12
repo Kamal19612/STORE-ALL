@@ -21,10 +21,12 @@ import com.storeall.api.config.AppProperties;
 import com.storeall.api.dto.OrderItemRequest;
 import com.storeall.api.dto.OrderRequest;
 import com.storeall.api.dto.OrderResponse;
+import com.storeall.api.entity.FulfillmentType;
 import com.storeall.api.entity.Order;
 import com.storeall.api.entity.OrderItem;
 import com.storeall.api.entity.OrderStatusHistory;
 import com.storeall.api.entity.Product;
+import com.storeall.api.entity.Store;
 import com.storeall.api.entity.DeliveryAssignment;
 import com.storeall.api.notification.NotificationChannel;
 import com.storeall.api.notification.NotificationRunner;
@@ -61,6 +63,9 @@ public class OrderService {
     private com.storeall.api.repository.UserRepository userRepository;
 
     @Autowired
+    private com.storeall.api.repository.StoreRepository storeRepository;
+
+    @Autowired
     private com.storeall.api.repository.DeliveryAssignmentRepository deliveryAssignmentRepository;
 
     @Autowired
@@ -95,6 +100,18 @@ public class OrderService {
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
         Long storeId = StoreContext.getStoreIdOrNull();
+        FulfillmentType fulfillment = FulfillmentType.fromRequest(request.getFulfillmentType());
+
+        if (fulfillment.isPickup()) {
+            if (request.getCustomerName() == null || request.getCustomerName().isBlank()) {
+                throw new RuntimeException("Le nom est obligatoire");
+            }
+            if (request.getCustomerPhone() == null || request.getCustomerPhone().isBlank()) {
+                throw new RuntimeException("Le téléphone est obligatoire");
+            }
+        } else if (request.getCustomerAddress() == null || request.getCustomerAddress().isBlank()) {
+            throw new RuntimeException("L'adresse est obligatoire pour une livraison");
+        }
 
         // 1. Générer un numéro de commande unique (ex: ORD-171569854)
         String orderNumber = "ORD-" + System.currentTimeMillis();
@@ -118,17 +135,18 @@ public class OrderService {
                 .store(com.storeall.api.entity.Store.builder().id(storeId).build())
                 .orderNumber(orderNumber)
                 .confirmationCode(confirmationCode)
+                .fulfillmentType(fulfillment)
                 .customerName(request.getCustomerName())
                 .customerPhone(request.getCustomerPhone())
-                .customerAddress(request.getCustomerAddress())
+                .customerAddress(fulfillment.isPickup() ? "Retrait en boutique" : request.getCustomerAddress())
                 .customerNotes(request.getCustomerNotes())
-                .customerLatitude(lat)
-                .customerLongitude(lng)
-                .deliveryType(request.getDeliveryType())
-                .scheduledTime(request.getScheduledTime())
-                .manualLocationLink(request.getManualLocationLink())
-                .deliveryCost(request.getDeliveryCost())
-                .distance(request.getDistance())
+                .customerLatitude(fulfillment.isPickup() ? null : lat)
+                .customerLongitude(fulfillment.isPickup() ? null : lng)
+                .deliveryType(fulfillment.isPickup() ? null : request.getDeliveryType())
+                .scheduledTime(fulfillment.isPickup() ? null : request.getScheduledTime())
+                .manualLocationLink(fulfillment.isPickup() ? null : request.getManualLocationLink())
+                .deliveryCost(fulfillment.isPickup() ? BigDecimal.ZERO : request.getDeliveryCost())
+                .distance(fulfillment.isPickup() ? null : request.getDistance())
                 .status(Order.Status.PENDING)
                 .items(new ArrayList<>())
                 .subtotal(BigDecimal.ZERO)
@@ -178,8 +196,9 @@ public class OrderService {
 
         // 4. Calculs finaux et sauvegarde
         order.setSubtotal(subtotal);
-        // Utiliser le total envoyé par le front ou recalculer
-        if (request.getTotalAmount() != null) {
+        if (fulfillment.isPickup()) {
+            order.setTotal(subtotal);
+        } else if (request.getTotalAmount() != null) {
             order.setTotal(request.getTotalAmount());
         } else {
             BigDecimal delivery = request.getDeliveryCost() != null ? request.getDeliveryCost() : BigDecimal.ZERO;
@@ -190,6 +209,7 @@ public class OrderService {
 
         // 5. Générer le lien WhatsApp
         String whatsappLink = generateWhatsAppLink(savedOrder);
+        String pickupMapsUrl = fulfillment.isPickup() ? resolveStoreMapsUrl(storeId) : null;
 
         // 6. Notifications : admin (SSE + Telegram) lors d'une nouvelle commande
         String currency = appProperties.getCurrency() != null ? appProperties.getCurrency() : "FCFA";
@@ -198,7 +218,8 @@ public class OrderService {
                 "orderNumber", savedOrder.getOrderNumber(),
                 "customerName", savedOrder.getCustomerName(),
                 "total", savedOrder.getTotal(),
-                "deliveryType", savedOrder.getDeliveryType() != null ? savedOrder.getDeliveryType() : ""
+                "deliveryType", savedOrder.getDeliveryType() != null ? savedOrder.getDeliveryType() : "",
+                "fulfillmentType", savedOrder.getFulfillmentType() != null ? savedOrder.getFulfillmentType().name() : "DELIVERY"
         );
 
         // IMPORTANT: ne pas mettre tous les canaux dans le même try/catch.
@@ -272,7 +293,19 @@ public class OrderService {
                 .totalAmount(savedOrder.getTotal())
                 .status(savedOrder.getStatus().name())
                 .whatsappLink(whatsappLink)
+                .fulfillmentType(savedOrder.getFulfillmentType() != null ? savedOrder.getFulfillmentType().name() : "DELIVERY")
+                .pickupMapsUrl(pickupMapsUrl != null && !pickupMapsUrl.isBlank() ? pickupMapsUrl : null)
                 .build();
+    }
+
+    private String resolveStoreMapsUrl(Long storeId) {
+        if (storeId != null) {
+            String maps = storeRepository.findById(storeId).map(Store::getMapsUrl).orElse("");
+            if (maps != null && !maps.isBlank()) {
+                return maps.trim();
+            }
+        }
+        return appSettingService.getSettingValue("store_location").orElse("").trim();
     }
 
     /**
@@ -293,29 +326,41 @@ public class OrderService {
             return "";
         }
 
-        message.append("*NOUVELLE COMMANDE ").append(storeName).append("*").append("\n\n");
+        boolean pickup = order.isPickup();
+        message.append(pickup
+                ? "*RETRAIT EN BOUTIQUE — " + storeName + "*"
+                : "*NOUVELLE COMMANDE " + storeName + "*").append("\n\n");
         message.append("Commande: #").append(order.getOrderNumber()).append("\n");
         message.append("Date: ").append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))).append("\n\n");
 
         message.append("*CLIENT*").append("\n");
         message.append("Nom: ").append(order.getCustomerName()).append("\n");
         message.append("Tel: ").append(order.getCustomerPhone()).append("\n");
-        message.append("Adresse: ").append(order.getCustomerAddress()).append("\n");
-
-        if (order.getCustomerLatitude() != null && order.getCustomerLongitude() != null) {
-            message.append("📍 Position: https://www.google.com/maps?q=").append(order.getCustomerLatitude()).append(",").append(order.getCustomerLongitude()).append("\n");
-        } else if (order.getManualLocationLink() != null && !order.getManualLocationLink().isEmpty()) {
-            message.append("📍 Position: ").append(order.getManualLocationLink()).append("\n");
-        }
-        
-        if (order.getDeliveryType() != null) {
-            message.append("🚚 Type: ").append(order.getDeliveryType());
-            if ("PROGRAMMER".equals(order.getDeliveryType()) && order.getScheduledTime() != null) {
-                message.append(" (").append(order.getScheduledTime()).append(")");
+        if (pickup) {
+            message.append("Mode: *Retrait sur place*\n");
+            Long storeId = order.getStore() != null ? order.getStore().getId() : StoreContext.getStoreIdOrNull();
+            String maps = resolveStoreMapsUrl(storeId);
+            if (!maps.isBlank()) {
+                message.append("📍 Lieu de retrait: ").append(maps).append("\n");
             }
-            message.append("\n");
+        } else {
+            message.append("Adresse: ").append(order.getCustomerAddress()).append("\n");
+
+            if (order.getCustomerLatitude() != null && order.getCustomerLongitude() != null) {
+                message.append("📍 Position: https://www.google.com/maps?q=").append(order.getCustomerLatitude()).append(",").append(order.getCustomerLongitude()).append("\n");
+            } else if (order.getManualLocationLink() != null && !order.getManualLocationLink().isEmpty()) {
+                message.append("📍 Position: ").append(order.getManualLocationLink()).append("\n");
+            }
+
+            if (order.getDeliveryType() != null) {
+                message.append("🚚 Type: ").append(order.getDeliveryType());
+                if ("PROGRAMMER".equals(order.getDeliveryType()) && order.getScheduledTime() != null) {
+                    message.append(" (").append(order.getScheduledTime()).append(")");
+                }
+                message.append("\n");
+            }
         }
-        
+
         message.append("\n");
 
         message.append("*ARTICLES*").append("\n");
@@ -488,8 +533,8 @@ public class OrderService {
                 }
             }
 
-            // Notification livreurs quand une commande est confirmée (disponible à livrer)
-            if (newStatus == Order.Status.CONFIRMED) {
+            // Notification livreurs quand une commande livraison est confirmée (pas les retraits boutique)
+            if (newStatus == Order.Status.CONFIRMED && savedOrder.isDelivery()) {
                 Map<String, Object> deliveryData = Map.of(
                         "id", savedOrder.getId(),
                         "orderNumber", savedOrder.getOrderNumber(),
@@ -840,6 +885,9 @@ public class OrderService {
     public Order claimOrder(Long orderId, String username) {
         Order order = getOrderForDelivery(orderId);
 
+        if (order.isPickup()) {
+            throw new RuntimeException("Cette commande est un retrait en boutique (pas de livraison).");
+        }
         if (order.getStatus() != Order.Status.CONFIRMED) {
             throw new RuntimeException("La commande n'est pas disponible (Statut: " + order.getStatus() + ")");
         }
@@ -877,6 +925,71 @@ public class OrderService {
             notificationService.notifyAdmins("order_status", statusData);
             if (fcmService != null) {
                 fcmService.notifyAdminsOrderStatus(saved, username);
+            }
+        } catch (Exception ignored) {}
+
+        return saved;
+    }
+
+    /**
+     * Staff boutique : valide le retrait en magasin avec le code client ({@link FulfillmentType#PICKUP}).
+     */
+    @Transactional
+    public Order completePickup(Long orderId, String code) {
+        Order order = getOrderById(orderId);
+
+        if (!order.isPickup()) {
+            throw new RuntimeException("Cette commande n'est pas un retrait en boutique.");
+        }
+        if (order.getStatus() != Order.Status.CONFIRMED) {
+            throw new RuntimeException(
+                "Le retrait ne peut être validé que pour une commande confirmée (statut actuel : "
+                    + order.getStatus() + ").");
+        }
+        if (order.getConfirmationCode() == null || order.getConfirmationCode().isBlank()) {
+            throw new RuntimeException("Code de confirmation manquant sur cette commande.");
+        }
+
+        String inputCode = code != null ? code.trim() : "";
+        if (inputCode.isEmpty()) {
+            throw new RuntimeException("Le code de confirmation est obligatoire.");
+        }
+        if (!inputCode.equalsIgnoreCase(order.getConfirmationCode())) {
+            throw new RuntimeException("Code de confirmation incorrect.");
+        }
+
+        order.setStatus(Order.Status.DELIVERED);
+        Order saved = orderRepository.save(order);
+
+        String actorUsername = null;
+        String actorRole = null;
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+            actorUsername = auth.getName();
+            actorRole = userRepository.findByUsername(actorUsername)
+                    .map(u -> u.getRole() != null ? u.getRole().name() : null)
+                    .orElse(null);
+        }
+
+        OrderStatusHistory history = OrderStatusHistory.builder()
+                .order(saved)
+                .status(Order.Status.DELIVERED)
+                .actorUsername(actorUsername)
+                .actorRole(actorRole)
+                .build();
+        statusHistoryRepository.save(history);
+
+        try {
+            Map<String, Object> statusData = new java.util.HashMap<>();
+            statusData.put("id", saved.getId());
+            statusData.put("orderNumber", saved.getOrderNumber());
+            statusData.put("status", saved.getStatus().name());
+            statusData.put("actorUsername", actorUsername == null ? "" : actorUsername);
+            statusData.put("actorRole", actorRole == null ? "" : actorRole);
+            statusData.put("fulfillmentType", "PICKUP");
+            notificationService.notifyAdmins("order_status", statusData);
+            if (fcmService != null) {
+                fcmService.notifyAdminsOrderStatus(saved, actorUsername);
             }
         } catch (Exception ignored) {}
 
@@ -991,9 +1104,9 @@ public class OrderService {
         Long storeId = StoreContext.getStoreIdOrNull();
         // Pool livraison global : StoreContext vide sur /api/delivery/** → toutes les boutiques.
         if (storeId == null) {
-            return orderRepository.findByStatusAndDeliveryAgentNullAndDeletedFalse(Order.Status.CONFIRMED, pageable);
+            return orderRepository.findDeliveryAvailableByStatus(Order.Status.CONFIRMED, pageable);
         }
-        return orderRepository.findByStatusAndDeliveryAgentNullAndDeletedFalseAndStore_Id(Order.Status.CONFIRMED, storeId, pageable);
+        return orderRepository.findDeliveryAvailableByStatusAndStore_Id(Order.Status.CONFIRMED, storeId, pageable);
     }
 
     /**

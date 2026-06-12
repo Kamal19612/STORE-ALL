@@ -11,7 +11,7 @@ const CategoryBar = ({
   const allCategories = ["Tous", ...categories];
 
   return (
-    <div className="relative w-full bg-white py-1 lg:hidden flex items-center overflow-hidden border-b border-gray-50 mb-0">
+    <div className="relative w-full bg-white pt-0 pb-1 lg:hidden flex items-center overflow-hidden border-b border-gray-50 mb-0">
       <div className="flex items-center w-full px-1">
         {/* Categories Scroll - Pill Style Design */}
         <div

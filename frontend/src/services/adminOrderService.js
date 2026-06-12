@@ -20,6 +20,14 @@ const adminOrderService = {
     return response.data;
   },
 
+  completePickup: async (id, code, managerStoreId) => {
+    const prefix = getManagerApiPrefix(managerStoreId);
+    const response = await api.post(`${prefix}/orders/${id}/complete-pickup`, {
+      code,
+    });
+    return response.data;
+  },
+
   deleteOrder: async (id, managerStoreId) => {
     const prefix = getManagerApiPrefix(managerStoreId);
     await api.delete(`${prefix}/orders/${id}`);

@@ -286,8 +286,7 @@ body {
 
 @media (max-width: 768px) {
 
-  /* ========== CAROUSEL FIXES ========== */
-  /* Replica exacte du style desktop mais avec hauteur adaptive pour mobile */
+  /* Carousels génériques */
   .slider-container {
     width: 100% !important;
     height: auto !important;
@@ -298,14 +297,6 @@ body {
     margin-bottom: 1rem !important;
     background-color: #f3f4f6 !important;
     border-radius: 0.5rem !important;
-  }
-
-  /* Force override du h-[400px] Tailwind */
-  div[className*="slider-container"] {
-    height: auto !important;
-    aspect-ratio: auto !important;
-    min-height: 200px !important;
-    max-height: 60vh !important;
   }
 
   .slider-container img,
@@ -319,6 +310,50 @@ body {
     object-position: center !important;
     display: block !important;
     background-color: transparent !important;
+  }
+
+  /* Vitrine classique : bannière collée à la barre catégories (override ci-dessus) */
+  .home-storefront-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 0.75rem;
+  }
+
+  .home-storefront-hero .slider-container,
+  .home-storefront-hero .hero-carousel.slider-container {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin-bottom: 0 !important;
+    background-color: transparent !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+  }
+
+  .home-storefront-hero .hero-wrapper {
+    line-height: 0;
+  }
+
+  .home-storefront-hero .hero-slide,
+  .home-storefront-hero .hero-slide.active {
+    display: block;
+    line-height: 0;
+  }
+
+  .home-storefront-hero .hero-slide img,
+  .home-storefront-hero .slider-container img,
+  .home-storefront-hero .hero-carousel img {
+    width: 100% !important;
+    height: auto !important;
+    max-height: min(400px, 56vw) !important;
+    object-fit: cover !important;
+    object-position: center !important;
+    display: block !important;
+    border-radius: 12px !important;
+    vertical-align: top;
   }
 
   /* ========== PRODUCT GRID FIXES ========== */
@@ -528,6 +563,28 @@ body {
     max-height: 400px !important;
     object-fit: contain !important;
     object-position: center !important;
+  }
+
+  /* Vitrine classique uniquement — carousel pleine largeur (aligné sucre-store, pas de bandes latérales) */
+  .home-storefront-hero .slider-container,
+  .home-storefront-hero .hero-carousel.slider-container {
+    background-color: transparent !important;
+  }
+
+  .home-storefront-hero .hero-wrapper {
+    line-height: 0;
+  }
+
+  .home-storefront-hero .hero-slide img,
+  .home-storefront-hero .slider-container img,
+  .home-storefront-hero .hero-carousel img {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 400px !important;
+    object-fit: cover !important;
+    object-position: center !important;
+    display: block !important;
+    background-color: transparent !important;
   }
 
   /* Product Cards - image suit la largeur de la colonne (carré) */

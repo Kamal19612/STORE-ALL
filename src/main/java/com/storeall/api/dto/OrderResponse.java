@@ -17,4 +17,8 @@ public class OrderResponse {
     private BigDecimal totalAmount;
     private String status;
     private String whatsappLink; // Le lien généré
+    /** {@code DELIVERY} ou {@code PICKUP}. */
+    private String fulfillmentType;
+    /** Lien Maps boutique (retrait) — renseigné pour {@code PICKUP} si configuré. */
+    private String pickupMapsUrl;
 }

@@ -34,6 +34,8 @@ const AdminOrderDetail = () => {
   const [deliveryTime, setDeliveryTime] = useState(null);
   const [whatsappSent, setWhatsappSent] = useState(false);
   const [justActioned, setJustActioned] = useState(null); // "confirmed" | "cancelled"
+  const [pickupCode, setPickupCode] = useState("");
+  const [pickupValidating, setPickupValidating] = useState(false);
 
   const fetchOrder = useCallback(async (silent = false) => {
     try {
@@ -91,6 +93,30 @@ const AdminOrderDetail = () => {
     }
   };
 
+  const handleCompletePickup = async () => {
+    const code = pickupCode.trim();
+    if (!code) {
+      toast.error("Saisissez le code de confirmation du client");
+      return;
+    }
+
+    setPickupValidating(true);
+    try {
+      await adminOrderService.completePickup(id, code, managerStoreId);
+      setPickupCode("");
+      await fetchOrder(true);
+      toast.success("Retrait confirmé — commande marquée comme récupérée");
+    } catch (error) {
+      const msg =
+        error.response?.data?.message ||
+        error.message ||
+        "Code incorrect ou validation impossible";
+      toast.error(msg);
+    } finally {
+      setPickupValidating(false);
+    }
+  };
+
   const handleWhatsAppNotify = async () => {
     try {
       const link = await adminOrderService.getWhatsAppNotificationLink(
@@ -110,6 +136,8 @@ const AdminOrderDetail = () => {
     return (
       <div className="p-10 text-center text-red-500">Commande introuvable</div>
     );
+
+  const isPickup = order.fulfillmentType === "PICKUP";
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -133,7 +161,7 @@ const AdminOrderDetail = () => {
       PENDING: "En attente",
       CONFIRMED: "Confirmée",
       SHIPPED: "En livraison",
-      DELIVERED: "Livrée",
+      DELIVERED: isPickup ? "Récupérée" : "Livrée",
       CANCELLED: "Annulée",
     };
     return labels[status] || status;
@@ -219,7 +247,7 @@ const AdminOrderDetail = () => {
                 </div>
                 <div>
                   <p className="text-[10px] text-green-600 dark:text-green-400 font-bold uppercase tracking-wider">
-                    Livrée le
+                    {isPickup ? "Récupérée le" : "Livrée le"}
                   </p>
                   <p className="text-sm font-bold text-green-800 dark:text-green-300">
                     {formatDate(deliveryTime)}
@@ -341,7 +369,7 @@ const AdminOrderDetail = () => {
                       </button>
                     </>
                   )}
-                  {order.status === "CONFIRMED" && (
+                  {order.status === "CONFIRMED" && !isPickup && (
                      <button
                         onClick={() => handleStatusChange("CANCELLED")}
                         disabled={updating}
@@ -350,6 +378,61 @@ const AdminOrderDetail = () => {
                         <XCircle className="w-5 h-5" />
                         Annuler
                       </button>
+                  )}
+                  {order.status === "CONFIRMED" && isPickup && (
+                    <div className="w-full space-y-3">
+                      <div className="bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-900/30 rounded-xl p-4">
+                        <p className="text-sm font-bold text-teal-900 dark:text-teal-200 mb-1">
+                          Validation du retrait en boutique
+                        </p>
+                        <p className="text-xs text-teal-800/80 dark:text-teal-300/80 mb-3">
+                          Demandez au client son code de confirmation
+                          {order.confirmationCode ? (
+                            <>
+                              {" "}
+                              (référence staff :{" "}
+                              <span className="font-mono font-bold">
+                                {order.confirmationCode}
+                              </span>
+                              )
+                            </>
+                          ) : (
+                            "."
+                          )}
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="off"
+                            placeholder="Code client"
+                            value={pickupCode}
+                            onChange={(e) => setPickupCode(e.target.value)}
+                            maxLength={10}
+                            className="flex-1 bg-white dark:bg-[#1c191a] border border-teal-200 dark:border-teal-800 rounded-xl px-4 py-3 text-center font-mono font-bold text-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleCompletePickup}
+                            disabled={pickupValidating || updating}
+                            className="sm:min-w-[180px] px-5 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-extrabold shadow-md shadow-green-600/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                          >
+                            <CheckCircle className="w-5 h-5" />
+                            {pickupValidating
+                              ? "Validation…"
+                              : "Confirmer le retrait"}
+                          </button>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleStatusChange("CANCELLED")}
+                        disabled={updating || pickupValidating}
+                        className="group w-full sm:w-auto px-5 py-3 bg-white text-red-700 border border-red-200 rounded-xl font-extrabold shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                      >
+                        <XCircle className="w-5 h-5" />
+                        Annuler la commande
+                      </button>
+                    </div>
                   )}
                   {(order.status === "SHIPPED" || order.status === "DELIVERED") && (
                     <p className="text-sm text-gray-500 italic">
@@ -466,11 +549,11 @@ const AdminOrderDetail = () => {
               </div>
             </div>
 
-            {/* 3. Delivery Info */}
+            {/* 3. Delivery / Pickup Info */}
             <div className="bg-white dark:bg-[#242021] rounded-xl shadow-sm border border-gray-200 dark:border-white/10 p-4 sm:p-5 transition-colors">
               <h3 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                 <Truck className="w-5 h-5 text-purple-500" />
-                Livraison
+                {order.fulfillmentType === "PICKUP" ? "Retrait en boutique" : "Livraison"}
               </h3>
 
               {/* Delivery Details */}
@@ -478,12 +561,24 @@ const AdminOrderDetail = () => {
                 <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#1c191a] rounded-lg border border-gray-100 dark:border-white/5 transition-all">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-white dark:bg-[#242021] flex items-center justify-center shadow-sm text-xl border border-gray-100 dark:border-white/5">
-                      {order.deliveryType === "EXPRESS" ? "⚡" : order.deliveryType === "PROGRAMMER" ? "📅" : "🛵"}
+                      {order.fulfillmentType === "PICKUP"
+                        ? "🏪"
+                        : order.deliveryType === "EXPRESS"
+                          ? "⚡"
+                          : order.deliveryType === "PROGRAMMER"
+                            ? "📅"
+                            : "🛵"}
                     </div>
                     <div>
-                      <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">Type</p>
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">Mode</p>
                       <p className="text-sm font-bold text-gray-900 dark:text-white">
-                        {order.deliveryType === "EXPRESS" ? "Express" : order.deliveryType === "PROGRAMMER" ? "Programmé" : "Standard"}
+                        {order.fulfillmentType === "PICKUP"
+                          ? "Retrait sur place"
+                          : order.deliveryType === "EXPRESS"
+                            ? "Express"
+                            : order.deliveryType === "PROGRAMMER"
+                              ? "Programmé"
+                              : "Standard"}
                       </p>
                     </div>
                   </div>
@@ -495,22 +590,39 @@ const AdminOrderDetail = () => {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-gray-50 dark:bg-[#1c191a] rounded-lg border border-gray-100 dark:border-white/5">
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">Frais</p>
-                    <p className="text-sm font-bold text-gray-900 dark:text-white">
-                      {order.deliveryCost ? `${order.deliveryCost.toLocaleString()} F` : "Gratuit"}
-                    </p>
+                {isPickup && order.status === "CONFIRMED" && (
+                  <div className="bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-200 dark:border-teal-900/30 p-3 text-xs text-teal-800 dark:text-teal-200">
+                    En attente du client en boutique — validez le retrait avec son
+                    code dans la section <strong>Actions</strong>.
                   </div>
-                  <div className="p-3 bg-gray-50 dark:bg-[#1c191a] rounded-lg border border-gray-100 dark:border-white/5">
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">Distance</p>
-                    <p className="text-sm font-bold text-gray-900 dark:text-white">
-                      {order.distance ? `${order.distance.toFixed(1)} km` : "N/A"}
-                    </p>
+                )}
+
+                {isPickup && order.status === "DELIVERED" && (
+                  <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-900/30 text-sm text-green-800 dark:text-green-300 font-medium">
+                    <CheckCircle className="w-4 h-4 shrink-0" />
+                    Retrait validé — produits remis au client.
                   </div>
-                </div>
+                )}
+
+                {!isPickup && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-gray-50 dark:bg-[#1c191a] rounded-lg border border-gray-100 dark:border-white/5">
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">Frais</p>
+                      <p className="text-sm font-bold text-gray-900 dark:text-white">
+                        {order.deliveryCost ? `${order.deliveryCost.toLocaleString()} F` : "Gratuit"}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-gray-50 dark:bg-[#1c191a] rounded-lg border border-gray-100 dark:border-white/5">
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">Distance</p>
+                      <p className="text-sm font-bold text-gray-900 dark:text-white">
+                        {order.distance ? `${order.distance.toFixed(1)} km` : "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
+              {!isPickup && (
               <div className="border-t border-gray-100 dark:border-white/5 pt-4">
                 <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase mb-3 tracking-wider">Livreur assigné</p>
                 {order.deliveryAgent ? (
@@ -565,6 +677,7 @@ const AdminOrderDetail = () => {
                   </div>
                 )}
               </div>
+              )}
             </div>
 
             {/* 4. History (Compact) */}

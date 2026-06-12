@@ -512,6 +512,7 @@ const Checkout = () => {
 
     const payload = {
       ...formData,
+      fulfillmentType: "DELIVERY",
       deliveryCost,
       distance,
       totalAmount: total + deliveryCost,
