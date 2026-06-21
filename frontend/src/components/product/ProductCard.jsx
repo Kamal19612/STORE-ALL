@@ -5,10 +5,14 @@ import { Check, ShoppingBag } from "lucide-react";
 import ProductDetailModal from "./ProductDetailModal";
 import { getProductGridText } from "../../utils/productCopy";
 import { getProductMainImageSrc } from "../../utils/productMedia";
+import {
+  needsPdfBeforeCart,
+  requestAddProductToCart,
+  requestToggleProductInCart,
+} from "../../utils/productCartFlow";
 
 const ProductCard = ({ product }) => {
-  const addItem = useCartStore((state) => state.addItem);
-  const removeItem = useCartStore((state) => state.removeItem);
+  const isProductInCart = useCartStore((state) => state.isProductInCart);
   const items = useCartStore((state) => state.items);
   const [showModal, setShowModal] = useState(false);
 
@@ -30,21 +34,24 @@ const ProductCard = ({ product }) => {
     return String(safe).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " FCFA";
   };
 
-  const isInCart = items.some((item) => item.id === product.id);
+  const requiresPdf = needsPdfBeforeCart(product);
+  const isInCart = !requiresPdf && isProductInCart(product.id);
+  const pdfLinesInCart = requiresPdf
+    ? items.filter((item) => item.id === product.id && item.hasPdfCustomization).length
+    : 0;
 
   const handleToggleCart = (e) => {
     e.stopPropagation();
     if (!canPurchase) return;
-    if (isInCart) {
-      removeItem(product.id);
-      // Silence removal toast to reduce noise
-    } else {
-      // Check if it's the first item being added to the cart
+
+    if (requiresPdf) {
+      requestAddProductToCart(product);
+      return;
+    }
+
+    const result = requestToggleProductInCart(product);
+    if (result === "added") {
       const isFirstItem = items.length === 0;
-
-      addItem(product);
-
-      // Show toast ONLY for the first product added
       if (isFirstItem) {
         toast.success("Produit ajouté ! Vérifiez votre panier en haut ↗", {
           icon: "🛒",

@@ -3,6 +3,11 @@ import { toast } from "react-toastify";
 import useCartStore from "../../../store/cartStore";
 import ProductImageCarousel from "../../../components/product/ProductImageCarousel";
 import { getProductCopySections } from "../../../utils/productCopy";
+import {
+  needsPdfBeforeCart,
+  requestAddProductToCart,
+  requestToggleProductInCart,
+} from "../../../utils/productCartFlow";
 
 function formatPrice(price) {
   const n = price != null && price !== "" ? Number(price) : 0;
@@ -11,7 +16,7 @@ function formatPrice(price) {
 }
 
 export default function AlibabaProductDetailModal({ product, onClose }) {
-  const addItem = useCartStore((state) => state.addItem);
+  const isProductInCart = useCartStore((state) => state.isProductInCart);
   const items = useCartStore((state) => state.items);
 
   if (!product) return null;
@@ -26,17 +31,18 @@ export default function AlibabaProductDetailModal({ product, onClose }) {
   const canPurchase = isPurchasable;
   const isRuptureOnly =
     !isArchived && purchaseAllowed && stockNum === 0 && !isPurchasable;
-  const isInCart = items.some((item) => item.id === product.id);
+  const requiresPdf = needsPdfBeforeCart(product);
+  const isInCart = !requiresPdf && isProductInCart(product.id);
 
   const handleAddToCart = (e) => {
     e.stopPropagation();
     if (!canPurchase) return;
-    if (isInCart) {
-      useCartStore.getState().removeItem(product.id);
-    } else {
-      addItem(product);
-      toast.success("Produit ajouté au panier");
+    if (requiresPdf) {
+      requestAddProductToCart(product);
+      return;
     }
+    const result = requestToggleProductInCart(product);
+    if (result === "added") toast.success("Produit ajouté au panier");
   };
 
   const { catalogDescription, usageInstructions, showCatalog, showUsage } =

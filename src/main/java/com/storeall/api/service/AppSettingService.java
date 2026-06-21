@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,7 +34,21 @@ public class AppSettingService {
         // (Delivery/global admin module can query other stores via a dedicated endpoint later.)
         return appSettingRepository.findAll().stream()
             .filter(s -> s.getStore() != null && storeId != null && storeId.equals(s.getStore().getId()))
+            .filter(s -> isSuperAdmin() || !isYengaPayKey(s.getKey()))
             .toList();
+    }
+
+    private static boolean isYengaPayKey(String key) {
+        return key != null && key.startsWith("yengapay_");
+    }
+
+    private static boolean isSuperAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getAuthorities() == null) {
+            return false;
+        }
+        return auth.getAuthorities().stream()
+            .anyMatch(a -> "ROLE_SUPER_ADMIN".equals(a.getAuthority()));
     }
 
     public Optional<String> getSettingValue(String key) {
@@ -175,6 +191,11 @@ public class AppSettingService {
         for (Map.Entry<String, String> entry : newSettings.entrySet()) {
             String key = entry.getKey();
             String value = entry.getValue();
+
+            if (isYengaPayKey(key) && !isSuperAdmin()) {
+                throw new org.springframework.security.access.AccessDeniedException(
+                    "Seul le super administrateur peut modifier les paramètres YengaPay");
+            }
 
             AppSetting setting = appSettingRepository.findFirstByKeyAndStoreIdOrderByIdAsc(key, storeId)
                 .orElse(AppSetting.builder()
@@ -374,7 +395,8 @@ public class AppSettingService {
             "dist_tier_1_limit", "dist_tier_1_price",
             "dist_tier_2_limit", "dist_tier_2_price",
             "dist_tier_3_price", "min_order_free_delivery",
-            "express_surcharge", "scheduled_surcharge"
+            "express_surcharge", "scheduled_surcharge",
+            "yengapay_enabled"
         };
 
         for (String key : publicKeys) {

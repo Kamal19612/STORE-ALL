@@ -16,6 +16,7 @@ import {
 import { toast } from "react-toastify";
 import useCartStore from "../../store/cartStore";
 import api, { getPublicSettings } from "../../services/api";
+import { submitOrder } from "../../services/orderService";
 import { useStorefrontBranding } from "../../context/StorefrontBrandingContext";
 import { useStorefrontHref } from "../../hooks/useStorefrontHref";
 import ProductImage from "../../components/product/ProductImage";
@@ -50,6 +51,7 @@ const OrderFulfillment = () => {
 
   const [step, setStep] = useState(STEPS.CHOICE);
   const [loading, setLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("COD");
   const [orderSuccess, setOrderSuccess] = useState(null);
   const [formData, setFormData] = useState({
     customerName: "",
@@ -70,6 +72,10 @@ const OrderFulfillment = () => {
   const dialCode =
     (appSettings.customer_whatsapp_dial_code || "+226").trim() || "+226";
   const dialPrefix = dialCode.endsWith(" ") ? dialCode : `${dialCode} `;
+  const yengapayEnabled =
+    appSettings.yengapay_enabled === "true" ||
+    appSettings.yengapay_enabled === "1" ||
+    appSettings.yengapay_enabled === "yes";
 
   const mapsUrl = resolveStoreMapsUrl(storeInfo, appSettings);
 
@@ -110,19 +116,29 @@ const OrderFulfillment = () => {
 
     const payload = {
       fulfillmentType: "PICKUP",
+      paymentMethod,
       customerName: formData.customerName.trim(),
       customerPhone: formData.customerPhone.trim(),
       customerNotes: formData.customerNotes,
       deliveryCost: 0,
       totalAmount: total,
-      items: items.map((item) => ({
-        productId: item.id,
-        quantity: item.quantity,
-      })),
     };
 
     try {
-      const response = await api.post("/orders", payload);
+      const response = await submitOrder(payload, items);
+      if (response.data?.yengapayCheckoutUrl) {
+        try {
+          sessionStorage.setItem(
+            `pending_payment_${response.data.orderNumber}`,
+            String(storeCode || ""),
+          );
+        } catch {
+          /* ignore */
+        }
+        clearCart();
+        window.location.href = response.data.yengapayCheckoutUrl;
+        return;
+      }
       setOrderSuccess(response.data);
       setStep(STEPS.SUCCESS);
       toast.success("Commande enregistrée !");
@@ -134,6 +150,7 @@ const OrderFulfillment = () => {
       console.error("Erreur commande retrait:", error);
       const errorMessage =
         error.response?.data?.message ||
+        error?.message ||
         "Une erreur est survenue lors de la commande.";
       toast.error(errorMessage);
     } finally {
@@ -326,6 +343,42 @@ const OrderFulfillment = () => {
                 />
               </div>
 
+              {yengapayEnabled ? (
+                <div className="space-y-3">
+                  <p className="text-sm font-bold text-gray-700 uppercase tracking-wider">
+                    Mode de paiement
+                  </p>
+                  <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer">
+                    <input
+                      type="radio"
+                      name="pickupPaymentMethod"
+                      value="COD"
+                      checked={paymentMethod === "COD"}
+                      onChange={() => setPaymentMethod("COD")}
+                      className="mt-1"
+                    />
+                    <div>
+                      <span className="font-bold text-secondary">Payer en boutique</span>
+                      <p className="text-xs text-gray-500">Espèces ou mobile money au retrait</p>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer">
+                    <input
+                      type="radio"
+                      name="pickupPaymentMethod"
+                      value="YENGAPAY"
+                      checked={paymentMethod === "YENGAPAY"}
+                      onChange={() => setPaymentMethod("YENGAPAY")}
+                      className="mt-1"
+                    />
+                    <div>
+                      <span className="font-bold text-secondary">Payer maintenant (YengaPay)</span>
+                      <p className="text-xs text-gray-500">Orange Money, Moov, Coris…</p>
+                    </div>
+                  </label>
+                </div>
+              ) : null}
+
               {mapsUrl && (
                 <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 flex gap-3">
                   <MapPin className="h-5 w-5 text-primary shrink-0 mt-0.5" />
@@ -351,7 +404,11 @@ const OrderFulfillment = () => {
                 className="btn-primary w-full py-4 text-lg font-bold flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <MessageSquare className="h-6 w-6" />
-                {loading ? "Enregistrement…" : "Valider et confirmer sur WhatsApp"}
+                {loading
+                  ? "Enregistrement…"
+                  : paymentMethod === "YENGAPAY" && yengapayEnabled
+                    ? "Payer avec YengaPay"
+                    : "Valider et confirmer sur WhatsApp"}
               </button>
 
               <p className="text-xs text-gray-400 text-center">

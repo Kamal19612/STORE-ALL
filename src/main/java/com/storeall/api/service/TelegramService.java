@@ -29,6 +29,7 @@ import com.storeall.api.entity.Store;
 import com.storeall.api.repository.AppSettingRepository;
 import com.storeall.api.repository.OrderRepository;
 import com.storeall.api.repository.StoreRepository;
+import com.storeall.api.util.PdfFieldValuesFormatter;
 import com.storeall.api.service.AppSettingService.ResolvedTelegramChatId;
 import com.storeall.api.service.AppSettingService.TelegramChatIdSource;
 import com.storeall.api.telegram.TelegramCallbackData;
@@ -705,7 +706,9 @@ public class TelegramService {
                 sb.append(i + 1).append(". <code>").append(escapeHtml(o.getOrderNumber())).append("</code> — ")
                   .append(escapeHtml(o.getCustomerName()))
                   .append(" — ").append(o.getTotal()).append(" ").append(escapeHtml(currency));
-                if (o.getDeliveryType() != null) {
+                if (o.isPickup()) {
+                    sb.append(" 🏪");
+                } else if (o.getDeliveryType() != null) {
                     String t = "EXPRESS".equals(o.getDeliveryType()) ? " ⚡" : " 🕐";
                     sb.append(t);
                 }
@@ -765,9 +768,27 @@ public class TelegramService {
         return name.isBlank() ? code : (name + " (" + code + ")");
     }
 
+    private String resolvePickupMapsUrl(Long storeId) {
+        if (storeId != null && storeRepository != null) {
+            String maps = storeRepository.findById(storeId).map(Store::getMapsUrl).orElse("");
+            if (maps != null && !maps.isBlank()) {
+                return maps.trim();
+            }
+        }
+        if (appSettingService != null && storeId != null) {
+            return appSettingService.getSettingValueForStore(storeId, "store_location").orElse("").trim();
+        }
+        if (appSettingService != null) {
+            return appSettingService.getSettingValue("store_location").orElse("").trim();
+        }
+        return "";
+    }
+
     private String buildNewOrderMessage(Order order, String currency, Long storeId) {
         StringBuilder sb = new StringBuilder();
-        sb.append("🛒 <b>NOUVELLE COMMANDE</b>\n");
+        sb.append(order.isPickup()
+            ? "🏪 <b>RETRAIT EN BOUTIQUE</b>\n"
+            : "🛒 <b>NOUVELLE COMMANDE</b>\n");
         String storeLabel = resolveStoreLabel(storeId);
         if (!storeLabel.isBlank()) {
             sb.append("🏪 <b>Boutique :</b> ").append(escapeHtml(storeLabel));
@@ -784,13 +805,11 @@ public class TelegramService {
         if (order.isPickup()) {
             sb.append("🏪 Mode : <b>Retrait en boutique</b>\n");
             Long sid = resolveOrderStoreId(order);
-            if (sid != null && storeRepository != null) {
-                storeRepository.findById(sid)
-                    .map(Store::getMapsUrl)
-                    .filter(v -> v != null && !v.isBlank())
-                    .ifPresent(maps -> sb.append("🗺 <a href=\"")
-                        .append(escapeHtml(maps.trim()))
-                        .append("\">Lieu de retrait</a>\n"));
+            String maps = resolvePickupMapsUrl(sid);
+            if (!maps.isBlank()) {
+                sb.append("🗺 <a href=\"")
+                    .append(escapeHtml(maps))
+                    .append("\">Lieu de retrait</a>\n");
             }
         } else {
             sb.append("📍 Adresse : ").append(escapeHtml(order.getCustomerAddress())).append("\n");
@@ -828,9 +847,23 @@ public class TelegramService {
             sb.append("  • ").append(item.getQuantity()).append("x ")
               .append(escapeHtml(item.getProduct().getName()))
               .append(" — ").append(item.getTotalPrice()).append(" ").append(escapeHtml(currency)).append("\n");
+            PdfFieldValuesFormatter.appendHtmlItemDetails(
+                    sb,
+                    item.getProduct().getName(),
+                    PdfFieldValuesFormatter.parse(item.getPdfFieldValues()));
         }
 
         sb.append("\n💰 <b>Total : ").append(order.getTotal()).append(" ").append(escapeHtml(currency)).append("</b>");
+
+        if (order.getConfirmationCode() != null && !order.getConfirmationCode().isBlank()) {
+            sb.append("\n🔑 Code client : <code>")
+                .append(escapeHtml(order.getConfirmationCode()))
+                .append("</code>");
+            if (order.isPickup()) {
+                sb.append(" (retrait boutique)");
+            }
+        }
+
         return sb.toString();
     }
 

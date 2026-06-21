@@ -3,9 +3,12 @@ package com.storeall.api.controller;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,7 +19,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.storeall.api.dto.ProductResponse;
 import com.storeall.api.entity.Category;
+import com.storeall.api.entity.Product;
 import com.storeall.api.service.CategoryService;
+import com.storeall.api.service.ProductPdfService;
 import com.storeall.api.service.ProductService;
 
 /**
@@ -30,6 +35,9 @@ public class ProductController {
 
     @Autowired
     private ProductService productService;
+
+    @Autowired
+    private ProductPdfService productPdfService;
 
     @Autowired
     private CategoryService categoryService;
@@ -97,5 +105,21 @@ public class ProductController {
     @GetMapping("/products/{slug:^(?!full$|top$).+}")
     public ResponseEntity<ProductResponse> getProductDetail(@PathVariable String slug) {
         return ResponseEntity.ok(productService.getProductBySlug(slug));
+    }
+
+    /**
+     * GET /api/products/{slug}/pdf-template : stream du PDF modèle (inline, non téléchargeable).
+     */
+    @GetMapping("/products/{slug:^(?!full$|top$).+}/pdf-template")
+    public ResponseEntity<Resource> getProductPdfTemplate(@PathVariable String slug) {
+        Product product = productPdfService.findProductWithTemplateBySlug(slug);
+        Resource resource = productPdfService.loadTemplateForProduct(product);
+        String fileName = productPdfService.templateDisplayName(product);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileName + "\"")
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(resource);
     }
 }

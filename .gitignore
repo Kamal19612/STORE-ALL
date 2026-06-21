@@ -54,6 +54,7 @@ frontend/.vite/
 
 ### Uploads locaux (médias produits) ###
 uploads/
+private-uploads/
 
 ### Supabase CLI ###
 supabase/.temp/

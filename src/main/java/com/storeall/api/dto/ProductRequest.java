@@ -64,4 +64,14 @@ public class ProductRequest {
      * Autorisation de vente (import / admin). Distinct du stock (rupture).
      */
     private boolean purchaseAllowed = true;
+
+    /**
+     * Exiger le remplissage du PDF modèle avant achat.
+     */
+    private boolean requiresPdfForm = false;
+
+    /**
+     * En édition : supprimer le PDF modèle existant.
+     */
+    private boolean removeTemplatePdf = false;
 }

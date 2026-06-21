@@ -15,4 +15,9 @@ public class OrderItemRequest {
 
     @Min(value = 1, message = "La quantité doit être au moins 1")
     private int quantity;
+
+    /**
+     * Valeurs des champs PDF remplis par le client (JSON).
+     */
+    private String pdfFieldValues;
 }

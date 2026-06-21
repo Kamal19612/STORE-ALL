@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import { toast } from "react-toastify";
 import adminProductService from "../../../services/adminProductService";
 import productService from "../../../services/productService";
 import ProductImagesField from "../../../components/admin/ProductImagesField";
+import ProductPdfTemplateField from "../../../components/admin/ProductPdfTemplateField";
 import useAuthStore from "../../../store/authStore";
 import { useStaffBasePath } from "../../../hooks/useStaffBasePath";
 
@@ -34,12 +35,17 @@ const AdminProductForm = () => {
     imageUrl: "", // Pour l'URL directe (ex: Google Drive/Sheet)
     active: true,
     purchaseAllowed: true,
+    requiresPdfForm: false,
+    removeTemplatePdf: false,
   });
 
   const [mainImageFile, setMainImageFile] = useState(null);
   const [existingMainImageUrl, setExistingMainImageUrl] = useState(null);
   const [secondaryImageFiles, setSecondaryImageFiles] = useState([]);
   const [existingSecondaryImages, setExistingSecondaryImages] = useState([]);
+  const [templatePdfFile, setTemplatePdfFile] = useState(null);
+  const [existingTemplateName, setExistingTemplateName] = useState(null);
+  const [removeTemplatePdf, setRemoveTemplatePdf] = useState(false);
 
   useEffect(() => {
     // Charger les catégories pour le select
@@ -83,8 +89,13 @@ const AdminProductForm = () => {
           imageUrl: "",
           active: Boolean(product.active),
           purchaseAllowed: product.purchaseAllowed !== false,
+          requiresPdfForm: Boolean(product.requiresPdfForm),
+          removeTemplatePdf: false,
         });
         setExistingMainImageUrl(product.mainImage || null);
+        setExistingTemplateName(product.templatePdfName || null);
+        setTemplatePdfFile(null);
+        setRemoveTemplatePdf(false);
         const secondaries = Array.isArray(product.secondaryImages)
           ? product.secondaryImages
           : [];
@@ -135,6 +146,41 @@ const AdminProductForm = () => {
     return val;
   };
 
+  const handlePdfTemplateChange = useCallback((next) => {
+    if (next.error) {
+      toast.error(next.error);
+      return;
+    }
+    if (next.templatePdfFile !== undefined) {
+      setTemplatePdfFile(next.templatePdfFile);
+      if (next.templatePdfFile) {
+        setRemoveTemplatePdf(false);
+        setFormData((prev) => ({
+          ...prev,
+          requiresPdfForm: true,
+          removeTemplatePdf: false,
+        }));
+      }
+    }
+    if (next.removeTemplatePdf) {
+      setTemplatePdfFile(null);
+      setExistingTemplateName(null);
+      setRemoveTemplatePdf(true);
+      setFormData((prev) => ({
+        ...prev,
+        requiresPdfForm: false,
+        removeTemplatePdf: true,
+      }));
+      return;
+    }
+    if (next.removeTemplatePdf === false) {
+      setRemoveTemplatePdf(false);
+    }
+    if (next.requiresPdfForm !== undefined) {
+      setFormData((prev) => ({ ...prev, requiresPdfForm: next.requiresPdfForm }));
+    }
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -159,6 +205,8 @@ const AdminProductForm = () => {
         categoryId: null, // On laisse le backend résoudre via le nom
         mainImageFile,
         secondaryImageFiles,
+        templatePdfFile,
+        removeTemplatePdf,
         secondaryImages: existingSecondaryImages, // URLs conservées (suppression/ré-ordre côté UI)
       };
 
@@ -172,7 +220,8 @@ const AdminProductForm = () => {
       navigate(`${staffBase}/products`);
     } catch (error) {
       console.error(error);
-      toast.error("Erreur lors de l'enregistrement");
+      const serverMsg = error?.response?.data?.message;
+      toast.error(serverMsg || "Erreur lors de l'enregistrement");
     } finally {
       setLoading(false);
     }
@@ -342,6 +391,15 @@ const AdminProductForm = () => {
               }}
             />
           </div>
+
+          <ProductPdfTemplateField
+            disabled={loading}
+            templatePdfFile={templatePdfFile}
+            existingTemplateName={existingTemplateName}
+            requiresPdfForm={formData.requiresPdfForm}
+            removeTemplatePdf={removeTemplatePdf}
+            onChange={handlePdfTemplateChange}
+          />
 
           {/* Checkbox Actif */}
           <div className="flex items-center gap-3 pt-4 border-t border-gray-100 dark:border-white/10">

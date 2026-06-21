@@ -45,4 +45,7 @@ public class OrderRequest {
     private List<OrderItemRequest> items;
 
     private BigDecimal totalAmount;
+
+    /** {@code COD} (défaut) ou {@code YENGAPAY}. */
+    private String paymentMethod;
 }

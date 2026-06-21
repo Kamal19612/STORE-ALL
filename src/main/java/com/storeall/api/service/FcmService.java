@@ -23,6 +23,7 @@ import com.storeall.api.entity.DeliveryDeviceToken;
 import com.storeall.api.entity.Order;
 import com.storeall.api.entity.User;
 import com.storeall.api.repository.DeliveryDeviceTokenRepository;
+import com.storeall.api.util.PdfFieldValuesFormatter;
 
 @Service
 public class FcmService {
@@ -158,6 +159,17 @@ public class FcmService {
             return;
         }
 
+        final boolean pickup = order.isPickup();
+        final String fulfillmentType = order.getFulfillmentType() != null
+            ? order.getFulfillmentType().name()
+            : "DELIVERY";
+        final String customizationSummary = PdfFieldValuesFormatter.compactSummary(order.getItems());
+        String fcmBody = "#" + order.getOrderNumber() + " — " + order.getCustomerName()
+            + (pickup ? " · Retrait" : " · Livraison");
+        if (!customizationSummary.isBlank()) {
+            fcmBody += "\n" + customizationSummary;
+        }
+
         for (DeliveryDeviceToken t : tokens) {
             try {
                 Message msg = Message.builder()
@@ -166,14 +178,15 @@ public class FcmService {
                         .setPriority(AndroidConfig.Priority.HIGH)
                         .build())
                     .setNotification(Notification.builder()
-                        .setTitle("Nouvelle commande")
-                        .setBody("#" + order.getOrderNumber() + " — " + order.getCustomerName())
+                        .setTitle(pickup ? "🏪 Retrait en boutique" : "Nouvelle commande")
+                        .setBody(fcmBody)
                         .build())
                     .putAllData(Map.of(
                         "type", "new_order",
                         "orderId", String.valueOf(order.getId()),
                         "orderNumber", order.getOrderNumber(),
-                        "status", order.getStatus().name()
+                        "status", order.getStatus().name(),
+                        "fulfillmentType", fulfillmentType
                     ))
                     .build();
                 FirebaseMessaging.getInstance().send(msg);
@@ -200,7 +213,10 @@ public class FcmService {
                         .build())
                     .setNotification(Notification.builder()
                         .setTitle("Statut mis à jour")
-                        .setBody("#" + order.getOrderNumber() + " → " + order.getStatus().name())
+                        .setBody("#" + order.getOrderNumber() + " → "
+                            + (order.isPickup() && order.getStatus() == com.storeall.api.entity.Order.Status.DELIVERED
+                                ? "Récupérée"
+                                : order.getStatus().name()))
                         .build())
                     .putAllData(Map.of(
                         "type", "order_status",

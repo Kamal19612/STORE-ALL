@@ -21,4 +21,9 @@ public class OrderResponse {
     private String fulfillmentType;
     /** Lien Maps boutique (retrait) — renseigné pour {@code PICKUP} si configuré. */
     private String pickupMapsUrl;
+
+    private String paymentMethod;
+    private String paymentStatus;
+    /** URL checkout YengaPay — présent si {@code paymentMethod=YENGAPAY}. */
+    private String yengapayCheckoutUrl;
 }

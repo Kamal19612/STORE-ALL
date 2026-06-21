@@ -58,6 +58,9 @@ public class AppProperties {
     public static class Storage {
 
         private String location = "uploads";
+
+        /** PDF produits / commandes — non exposé via /uploads/** */
+        private String privateLocation = "private-uploads";
     }
 
     @Data

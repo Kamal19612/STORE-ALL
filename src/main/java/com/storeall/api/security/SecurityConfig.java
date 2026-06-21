@@ -90,6 +90,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/api/telegram/**").permitAll()
                         .requestMatchers("/api/notifications/push/customer-subscribe").permitAll()
+                        .requestMatchers("/api/payments/yengapay/webhook").permitAll()
                         // Tout le reste nécessite une authentification
                         .anyRequest().authenticated()
                 );

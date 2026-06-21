@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,6 +40,9 @@ public class ProductServiceTest {
 
     @Mock
     private CategoryRepository categoryRepository;
+
+    @Mock
+    private ProductPdfService productPdfService;
 
     @InjectMocks
     private ProductService productService;
@@ -81,6 +85,8 @@ public class ProductServiceTest {
         productRequest.setPrice(new BigDecimal("999.99"));
         productRequest.setStock(10);
         productRequest.setActive(true);
+
+        lenient().when(productPdfService.templateDisplayName(any(Product.class))).thenReturn(null);
     }
 
     @org.junit.jupiter.api.AfterEach
@@ -140,7 +146,7 @@ public class ProductServiceTest {
         when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
         when(productRepository.save(any(Product.class))).thenReturn(product);
 
-        ProductResponse result = productService.createProduct(productRequest, "image-url.jpg", java.util.List.of());
+        ProductResponse result = productService.createProduct(productRequest, "image-url.jpg", java.util.List.of(), null);
 
         assertNotNull(result);
         assertEquals("Laptop", result.getName());

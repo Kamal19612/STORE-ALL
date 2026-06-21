@@ -65,7 +65,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
             ) : (
               items.map((item) => (
                 <div
-                  key={item.id}
+                  key={item.cartLineId}
                   className="cart-drawer-item flex gap-4 p-3 bg-gray-50 rounded-xl border border-gray-100 group"
                 >
                   <div className="cart-drawer-item-image h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-white border border-gray-100">
@@ -81,10 +81,15 @@ const CartDrawer = ({ isOpen, onClose }) => {
                     <div className="flex justify-between items-start">
                       <h4 className="cart-drawer-item-name font-bold text-secondary text-sm line-clamp-2">
                         {item.name}
+                        {item.hasPdfCustomization ? (
+                          <span className="block text-[10px] font-semibold text-primary mt-0.5">
+                            Personnalisé (PDF)
+                          </span>
+                        ) : null}
                       </h4>
                       <button
                         type="button"
-                        onClick={() => removeItem(item.id)}
+                        onClick={() => removeItem(item.cartLineId)}
                         className="text-gray-400 hover:text-red-500 p-1"
                         aria-label="Retirer du panier"
                       >
@@ -97,7 +102,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                         <button
                           type="button"
                           onClick={() =>
-                            updateQuantity(item.id, item.quantity - 1)
+                            updateQuantity(item.cartLineId, item.quantity - 1)
                           }
                           className="p-1 rounded-full hover:bg-gray-100 text-secondary"
                           aria-label="Diminuer la quantité"
@@ -110,7 +115,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                         <button
                           type="button"
                           onClick={() =>
-                            updateQuantity(item.id, item.quantity + 1)
+                            updateQuantity(item.cartLineId, item.quantity + 1)
                           }
                           className="p-1 rounded-full hover:bg-gray-100 text-secondary"
                           aria-label="Augmenter la quantité"

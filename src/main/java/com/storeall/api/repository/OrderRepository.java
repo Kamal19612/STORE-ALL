@@ -25,6 +25,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      */
     Optional<Order> findByOrderNumber(String orderNumber);
 
+    @EntityGraph(attributePaths = {"items", "items.product", "store"})
+    Optional<Order> findWithDetailsByOrderNumber(String orderNumber);
+
     /**
      * Trouve les commandes ayant l'un des statuts donnés.
      */

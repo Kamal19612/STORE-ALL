@@ -39,6 +39,16 @@ const adminOrderService = {
     return response.data;
   },
 
+  openOrderItemPdf: async (orderId, itemId, managerStoreId) => {
+    const prefix = getManagerApiPrefix(managerStoreId);
+    const response = await api.get(`${prefix}/orders/${orderId}/items/${itemId}/pdf`, {
+      responseType: "blob",
+    });
+    const url = URL.createObjectURL(response.data);
+    window.open(url, "_blank", "noopener,noreferrer");
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  },
+
   getWhatsAppNotificationLink: async (orderId, phoneNumber, managerStoreId) => {
     const prefix = getManagerApiPrefix(managerStoreId);
     let url = `${prefix}/orders/${orderId}/whatsapp-notification`;

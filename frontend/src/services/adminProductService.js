@@ -16,7 +16,7 @@ const adminProductService = {
   createProduct: async (productData, managerStoreId) => {
     const prefix = getManagerApiPrefix(managerStoreId);
     const formData = new FormData();
-    const { imageFile, mainImageFile, secondaryImageFiles, ...jsonPayload } = productData;
+    const { imageFile, mainImageFile, secondaryImageFiles, templatePdfFile, ...jsonPayload } = productData;
 
     formData.append("product", JSON.stringify(jsonPayload));
 
@@ -28,6 +28,8 @@ const adminProductService = {
         if (file) formData.append("secondaryImages", file);
       });
     }
+
+    if (templatePdfFile) formData.append("templatePdf", templatePdfFile);
 
     const response = await api.post(`${prefix}/products`, formData);
     return response.data;
@@ -36,7 +38,7 @@ const adminProductService = {
   updateProduct: async (id, productData, managerStoreId) => {
     const prefix = getManagerApiPrefix(managerStoreId);
     const formData = new FormData();
-    const { imageFile, mainImageFile, secondaryImageFiles, ...jsonPayload } = productData;
+    const { imageFile, mainImageFile, secondaryImageFiles, templatePdfFile, ...jsonPayload } = productData;
 
     formData.append("product", JSON.stringify(jsonPayload));
 
@@ -48,6 +50,8 @@ const adminProductService = {
         if (file) formData.append("secondaryImages", file);
       });
     }
+
+    if (templatePdfFile) formData.append("templatePdf", templatePdfFile);
 
     const response = await api.put(`${prefix}/products/${id}`, formData);
     return response.data;

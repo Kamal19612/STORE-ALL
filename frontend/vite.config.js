@@ -11,6 +11,45 @@ function intEnv(env, key, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function resolveHmrConfig(env, devPort) {
+  const publicOrigin = env.VITE_DEV_PUBLIC_ORIGIN?.trim();
+  const hmrHost = env.VITE_HMR_HOST?.trim();
+
+  if (publicOrigin) {
+    try {
+      const url = new URL(publicOrigin);
+      const isHttps = url.protocol === "https:";
+      return {
+        origin: publicOrigin.replace(/\/$/, ""),
+        hmr: {
+          host: hmrHost || url.hostname,
+          protocol: env.VITE_HMR_PROTOCOL?.trim() || (isHttps ? "wss" : "ws"),
+          clientPort: intEnv(
+            env,
+            "VITE_HMR_CLIENT_PORT",
+            url.port ? Number(url.port) : isHttps ? 443 : 80,
+          ),
+        },
+      };
+    } catch {
+      console.warn("[vite] VITE_DEV_PUBLIC_ORIGIN invalide — HMR local.");
+    }
+  }
+
+  if (hmrHost) {
+    return {
+      hmr: {
+        host: hmrHost,
+        protocol: env.VITE_HMR_PROTOCOL?.trim() || "wss",
+        clientPort: intEnv(env, "VITE_HMR_CLIENT_PORT", 443),
+      },
+    };
+  }
+
+  // Dev local uniquement (localhost:5176) — pas de clientPort forcé.
+  return { hmr: true };
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -23,30 +62,24 @@ export default defineConfig(({ mode }) => {
     "8085";
   const backendOrigin = `http://127.0.0.1:${backendPort}`;
 
-  // Si tu développes derrière un reverse-proxy HTTPS (ex: https://ton-domaine.tld),
-  // tu peux activer un HMR explicite via:
-  //   VITE_HMR_HOST=ton-domaine.tld
-  //   VITE_HMR_PROTOCOL=wss
-  //   VITE_HMR_CLIENT_PORT=443
-  const hmrHost = env.VITE_HMR_HOST?.trim();
-  const hmr =
-    hmrHost && hmrHost.length > 0
-      ? {
-          host: hmrHost,
-          protocol: env.VITE_HMR_PROTOCOL?.trim() || "wss",
-          clientPort: Number(env.VITE_HMR_CLIENT_PORT || 443),
-        }
-      : undefined;
+  const proxyDev = resolveHmrConfig(env, devPort);
 
   return {
     plugins: [react(), tailwindcss()],
+    resolve: {
+      dedupe: ["react", "react-dom"],
+    },
     test: {
       environment: "node",
       include: ["src/**/*.test.{js,jsx}"],
     },
+    optimizeDeps: {
+      include: ["react", "react-dom", "react/jsx-runtime", "pdf-lib"],
+    },
+    // Évite les conflits de cache si plusieurs projets Vite partagent node_modules.
+    cacheDir: "node_modules/.vite-store-all",
     server: {
       host: "0.0.0.0",
-      // strictPort : si le port est pris, Vite échoue au lieu d’incrémenter (évite deux origines → localStorage divergent).
       port: devPort,
       strictPort: true,
       proxy: {
@@ -59,10 +92,8 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
         },
       },
-      allowedHosts: [
-  "store.socialracine.com"
-],
-      hmr,
+      allowedHosts: ["store.socialracine.com", "localhost", "127.0.0.1"],
+      ...proxyDev,
     },
     preview: {
       host: "0.0.0.0",

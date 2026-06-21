@@ -119,4 +119,7 @@ export const unregisterTelegramWebhook = (managerStoreId) =>
 export const sendTelegramTest = (text, managerStoreId) =>
   api.post(`${getManagerApiPrefix(managerStoreId)}/telegram/test`, { text });
 
+export const getPaymentStatus = (orderNumber) =>
+  api.get(`/public/payments/status/${encodeURIComponent(orderNumber)}`);
+
 export default api;

@@ -8,12 +8,11 @@
 
 let deferredPrompt = null;
 
-// Enregistrement immédiat — s'exécute dès que le bundle est parsé
-if (typeof window !== "undefined") {
+// En dev Vite : pas d'écoute PWA (évite le message console « Banner not shown »).
+if (typeof window !== "undefined" && !import.meta.env.DEV) {
   window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    // Notifie les composants React déjà montés
     window.dispatchEvent(new CustomEvent("pwa:installable"));
   });
 

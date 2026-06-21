@@ -4,6 +4,11 @@ import useCartStore from "../../../store/cartStore";
 import ProductImage from "../../../components/product/ProductImage";
 import { getProductGridText } from "../../../utils/productCopy";
 import BrandsamaProductDetailModal from "./BrandsamaProductDetailModal";
+import {
+  needsPdfBeforeCart,
+  requestAddProductToCart,
+  requestToggleProductInCart,
+} from "../../../utils/productCartFlow";
 
 function formatPrice(price) {
   const n = price != null && price !== "" ? Number(price) : 0;
@@ -15,8 +20,7 @@ function formatPrice(price) {
  * Carte produit alignée sur {@link ProductCard} (thème classique), version compacte Brandsama.
  */
 export default function BrandsamaProductCard({ product }) {
-  const addItem = useCartStore((state) => state.addItem);
-  const removeItem = useCartStore((state) => state.removeItem);
+  const isProductInCart = useCartStore((state) => state.isProductInCart);
   const items = useCartStore((state) => state.items);
   const [showModal, setShowModal] = useState(false);
 
@@ -30,23 +34,23 @@ export default function BrandsamaProductCard({ product }) {
   const canPurchase = isPurchasable;
   const isRuptureOnly =
     !isArchived && purchaseAllowed && stockNum === 0 && !isPurchasable;
-  const isInCart = items.some((item) => item.id === product.id);
+  const requiresPdf = needsPdfBeforeCart(product);
+  const isInCart = !requiresPdf && isProductInCart(product.id);
   const listingText = getProductGridText(product);
 
   const handleToggleCart = (e) => {
     e.stopPropagation();
     if (!canPurchase) return;
-    if (isInCart) {
-      removeItem(product.id);
-    } else {
-      const isFirstItem = items.length === 0;
-      addItem(product);
-      if (isFirstItem) {
-        toast.success("Produit ajouté ! Vérifiez votre panier en haut ↗", {
-          icon: "🛒",
-          autoClose: 2000,
-        });
-      }
+    if (requiresPdf) {
+      requestAddProductToCart(product);
+      return;
+    }
+    const result = requestToggleProductInCart(product);
+    if (result === "added" && items.length === 0) {
+      toast.success("Produit ajouté ! Vérifiez votre panier en haut ↗", {
+        icon: "🛒",
+        autoClose: 2000,
+      });
     }
   };
 

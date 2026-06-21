@@ -1,19 +1,40 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
-import { Settings, Save, RefreshCw } from "lucide-react";
+import { Settings, Save, RefreshCw, CreditCard } from "lucide-react";
 import {
   getSuperTelegramPlatformSettings,
   updateSuperTelegramPlatformSettings,
   getSuperApplicationSummary,
   sendSuperTelegramTest,
+  listStores,
 } from "../../../services/adminSupervisionService";
+import { getAdminSettings, updateSettings } from "../../../services/api";
 
 const inputCls =
   "w-full p-2 border border-gray-300 dark:border-white/10 rounded bg-white dark:bg-[#1c191a] text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-colors";
 const labelCls = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
 const sectionTitleCls =
   "text-lg font-semibold text-gray-800 dark:text-white border-b border-gray-200 dark:border-white/10 pb-2";
+
+const YENGAPAY_KEYS = [
+  "yengapay_enabled",
+  "yengapay_group_id",
+  "yengapay_project_id",
+  "yengapay_api_key",
+  "yengapay_webhook_secret",
+  "yengapay_api_env",
+];
+
+function pickYengaPaySettings(settingsMap) {
+  const out = {};
+  for (const key of YENGAPAY_KEYS) {
+    if (settingsMap[key] != null) {
+      out[key] = settingsMap[key];
+    }
+  }
+  return out;
+}
 
 export default function SuperAdminSettings() {
   const [loading, setLoading] = useState(true);
@@ -24,16 +45,47 @@ export default function SuperAdminSettings() {
   const [telegramActionLoading, setTelegramActionLoading] = useState(false);
   const [telegramTestText, setTelegramTestText] = useState("Test Telegram (super admin)");
 
+  const [stores, setStores] = useState([]);
+  const [selectedStoreId, setSelectedStoreId] = useState("");
+  const [yengaPaySettings, setYengaPaySettings] = useState({});
+  const [yengaPayLoading, setYengaPayLoading] = useState(false);
+  const [yengaPaySaving, setYengaPaySaving] = useState(false);
+
+  const loadYengaPayForStore = useCallback(async (storeId) => {
+    if (!storeId) {
+      setYengaPaySettings({});
+      return;
+    }
+    setYengaPayLoading(true);
+    try {
+      const response = await getAdminSettings(storeId);
+      const settingsMap = {};
+      response.data.forEach((s) => {
+        settingsMap[s.key] = s.value;
+      });
+      setYengaPaySettings(pickYengaPaySettings(settingsMap));
+    } catch (e) {
+      toast.error("Impossible de charger les paramètres YengaPay de la boutique.");
+      setYengaPaySettings({});
+    } finally {
+      setYengaPayLoading(false);
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [tg, summary] = await Promise.all([
+      const [tg, summary, storeList] = await Promise.all([
         getSuperTelegramPlatformSettings(),
         getSuperApplicationSummary(),
+        listStores(),
       ]);
       setTelegramBotToken(tg.telegram_bot_token ?? "");
       setTelegramChatId(tg.telegram_chat_id ?? "");
       setAppSummary(summary);
+      const list = Array.isArray(storeList) ? storeList : [];
+      setStores(list);
+      setSelectedStoreId((prev) => prev || (list[0] ? String(list[0].id) : ""));
     } catch (e) {
       toast.error(e.response?.data?.message || "Impossible de charger les paramètres plateforme.");
     } finally {
@@ -44,6 +96,12 @@ export default function SuperAdminSettings() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (selectedStoreId) {
+      loadYengaPayForStore(selectedStoreId);
+    }
+  }, [selectedStoreId, loadYengaPayForStore]);
 
   const handleSaveTelegram = async (e) => {
     e.preventDefault();
@@ -62,6 +120,37 @@ export default function SuperAdminSettings() {
     }
   };
 
+  const handleYengaPayChange = (e) => {
+    const { name, value } = e.target;
+    setYengaPaySettings((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveYengaPay = async (e) => {
+    e.preventDefault();
+    if (!selectedStoreId) {
+      toast.error("Sélectionnez une boutique.");
+      return;
+    }
+    setYengaPaySaving(true);
+    try {
+      const payload = {
+        ...yengaPaySettings,
+        yengapay_enabled:
+          yengaPaySettings.yengapay_enabled === "true" ||
+          yengaPaySettings.yengapay_enabled === "1"
+            ? "true"
+            : "false",
+      };
+      await updateSettings(payload, selectedStoreId);
+      toast.success("Paramètres YengaPay enregistrés pour la boutique.");
+      await loadYengaPayForStore(selectedStoreId);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Échec de l'enregistrement YengaPay.");
+    } finally {
+      setYengaPaySaving(false);
+    }
+  };
+
   const handleTest = async () => {
     setTelegramActionLoading(true);
     try {
@@ -73,6 +162,8 @@ export default function SuperAdminSettings() {
       setTelegramActionLoading(false);
     }
   };
+
+  const selectedStore = stores.find((s) => String(s.id) === String(selectedStoreId));
 
   if (loading) {
     return <div className="p-4 sm:p-8 text-gray-600 dark:text-gray-300">Chargement…</div>;
@@ -95,6 +186,153 @@ export default function SuperAdminSettings() {
       </div>
 
       <div className="bg-white dark:bg-[#242021] rounded-lg shadow-md p-4 sm:p-6 space-y-8">
+        <section className="rounded-xl border border-violet-200/80 dark:border-violet-900/40 bg-violet-50/40 dark:bg-violet-950/25 p-4 sm:p-6 space-y-4">
+          <h2 className={`${sectionTitleCls} flex items-center gap-2`}>
+            <CreditCard className="w-5 h-5 text-violet-600 dark:text-violet-300" />
+            YengaPay — Paiement en ligne
+          </h2>
+          <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+            Configuration réservée au super administrateur. Choisissez la boutique, puis renseignez les clés YengaPay
+            pour activer le paiement Mobile Money au checkout client.
+          </p>
+
+          <div>
+            <label className={labelCls}>Boutique</label>
+            <select
+              value={selectedStoreId}
+              onChange={(e) => setSelectedStoreId(e.target.value)}
+              className={inputCls}
+            >
+              {stores.length === 0 ? (
+                <option value="">Aucune boutique</option>
+              ) : (
+                stores.map((s) => (
+                  <option key={s.id} value={String(s.id)}>
+                    {s.name} ({s.code})
+                  </option>
+                ))
+              )}
+            </select>
+            {selectedStore?.code ? (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                URL retour client :{" "}
+                <code className="font-mono">
+                  /{selectedStore.code}/paiement/retour?order=&#123;reference&#125;
+                </code>
+              </p>
+            ) : null}
+          </div>
+
+          {yengaPayLoading ? (
+            <p className="text-sm text-gray-500">Chargement YengaPay…</p>
+          ) : (
+            <form onSubmit={handleSaveYengaPay} className="space-y-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="yengapay_enabled"
+                  checked={
+                    yengaPaySettings.yengapay_enabled === "true" ||
+                    yengaPaySettings.yengapay_enabled === "1"
+                  }
+                  onChange={(e) =>
+                    setYengaPaySettings((prev) => ({
+                      ...prev,
+                      yengapay_enabled: e.target.checked ? "true" : "false",
+                    }))
+                  }
+                  className="rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Activer YengaPay au checkout
+                  {selectedStore?.name ? ` — ${selectedStore.name}` : ""}
+                </span>
+              </label>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Group ID</label>
+                  <input
+                    type="text"
+                    name="yengapay_group_id"
+                    value={yengaPaySettings.yengapay_group_id || ""}
+                    onChange={handleYengaPayChange}
+                    placeholder="Ex: 1856655"
+                    className={`${inputCls} font-mono`}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Project ID</label>
+                  <input
+                    type="text"
+                    name="yengapay_project_id"
+                    value={yengaPaySettings.yengapay_project_id || ""}
+                    onChange={handleYengaPayChange}
+                    placeholder="Ex: 15656"
+                    className={`${inputCls} font-mono`}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Clé API (x-api-key)</label>
+                  <input
+                    type="password"
+                    name="yengapay_api_key"
+                    value={yengaPaySettings.yengapay_api_key || ""}
+                    onChange={handleYengaPayChange}
+                    className={`${inputCls} font-mono`}
+                    autoComplete="off"
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Webhook Secret</label>
+                  <input
+                    type="password"
+                    name="yengapay_webhook_secret"
+                    value={yengaPaySettings.yengapay_webhook_secret || ""}
+                    onChange={handleYengaPayChange}
+                    className={`${inputCls} font-mono`}
+                    autoComplete="off"
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Environnement API</label>
+                  <select
+                    name="yengapay_api_env"
+                    value={yengaPaySettings.yengapay_api_env || "test"}
+                    onChange={handleYengaPayChange}
+                    className={inputCls}
+                  >
+                    <option value="test">test (sandbox)</option>
+                    <option value="prod">prod (production)</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className={labelCls}>URL Webhook (dashboard YengaPay)</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={
+                      typeof window !== "undefined"
+                        ? `${window.location.origin}/api/payments/yengapay/webhook`
+                        : "/api/payments/yengapay/webhook"
+                    }
+                    className={`${inputCls} font-mono text-sm bg-gray-50 dark:bg-black/20`}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={yengaPaySaving || !selectedStoreId}
+                className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg font-bold text-sm disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                {yengaPaySaving ? "Enregistrement…" : "Enregistrer YengaPay"}
+              </button>
+            </form>
+          )}
+        </section>
+
         <section>
           <h2 className={sectionTitleCls}>Gestion de l&apos;application</h2>
           {appSummary ? (

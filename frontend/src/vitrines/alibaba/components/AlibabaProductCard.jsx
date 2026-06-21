@@ -5,6 +5,11 @@ import useCartStore from "../../../store/cartStore";
 import ProductImage from "../../../components/product/ProductImage";
 import { getProductGridText } from "../../../utils/productCopy";
 import AlibabaProductDetailModal from "./AlibabaProductDetailModal";
+import {
+  needsPdfBeforeCart,
+  requestAddProductToCart,
+  requestToggleProductInCart,
+} from "../../../utils/productCartFlow";
 
 function formatPrice(price) {
   const n = price != null && price !== "" ? Number(price) : 0;
@@ -13,8 +18,7 @@ function formatPrice(price) {
 }
 
 export default function AlibabaProductCard({ product }) {
-  const addItem = useCartStore((state) => state.addItem);
-  const removeItem = useCartStore((state) => state.removeItem);
+  const isProductInCart = useCartStore((state) => state.isProductInCart);
   const items = useCartStore((state) => state.items);
   const [showModal, setShowModal] = useState(false);
 
@@ -26,20 +30,20 @@ export default function AlibabaProductCard({ product }) {
       ? product.available
       : !isArchived && purchaseAllowed && stockNum > 0;
   const canPurchase = isPurchasable;
-  const isInCart = items.some((item) => item.id === product.id);
+  const requiresPdf = needsPdfBeforeCart(product);
+  const isInCart = !requiresPdf && isProductInCart(product.id);
   const listingText = getProductGridText(product);
 
   const handleToggleCart = (e) => {
     e.stopPropagation();
     if (!canPurchase) return;
-    if (isInCart) {
-      removeItem(product.id);
-    } else {
-      const isFirstItem = items.length === 0;
-      addItem(product);
-      if (isFirstItem) {
-        toast.success("Produit ajouté — consultez votre panier", { autoClose: 2000 });
-      }
+    if (requiresPdf) {
+      requestAddProductToCart(product);
+      return;
+    }
+    const result = requestToggleProductInCart(product);
+    if (result === "added" && items.length === 0) {
+      toast.success("Produit ajouté — consultez votre panier", { autoClose: 2000 });
     }
   };
 

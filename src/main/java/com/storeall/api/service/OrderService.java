@@ -6,6 +6,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -16,15 +18,21 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.core.io.Resource;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.storeall.api.config.AppProperties;
 import com.storeall.api.dto.OrderItemRequest;
 import com.storeall.api.dto.OrderRequest;
 import com.storeall.api.dto.OrderResponse;
+import com.storeall.api.dto.PaymentStatusResponse;
+import com.storeall.api.dto.YengaPayIntentResponse;
 import com.storeall.api.entity.FulfillmentType;
 import com.storeall.api.entity.Order;
 import com.storeall.api.entity.OrderItem;
 import com.storeall.api.entity.OrderStatusHistory;
+import com.storeall.api.entity.PaymentMethod;
+import com.storeall.api.entity.PaymentStatus;
 import com.storeall.api.entity.Product;
 import com.storeall.api.entity.Store;
 import com.storeall.api.entity.DeliveryAssignment;
@@ -35,6 +43,7 @@ import com.storeall.api.repository.OrderStatusHistoryRepository;
 import com.storeall.api.repository.ProductRepository;
 import com.storeall.api.entity.NotificationOutbox;
 import com.storeall.api.tenant.StoreContext;
+import com.storeall.api.util.PdfFieldValuesFormatter;
 
 /**
  * Service gérant la logique métier pour les commandes (Checkout).
@@ -90,6 +99,12 @@ public class OrderService {
     @Lazy
     private FcmService fcmService;
 
+    @Autowired
+    private PrivateFileStorageService privateFileStorageService;
+
+    @Autowired
+    private YengaPayService yengaPayService;
+
     // Livraison mobile: lecture directe Supabase (Auth + RPC).
 
     /**
@@ -99,8 +114,26 @@ public class OrderService {
      */
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
+        return createOrder(request, Collections.emptyMap());
+    }
+
+    @Transactional
+    public OrderResponse createOrder(OrderRequest request, Map<Integer, MultipartFile> filledPdfsByIndex) {
+        if (filledPdfsByIndex == null) {
+            filledPdfsByIndex = Collections.emptyMap();
+        }
         Long storeId = StoreContext.getStoreIdOrNull();
         FulfillmentType fulfillment = FulfillmentType.fromRequest(request.getFulfillmentType());
+        PaymentMethod paymentMethod = PaymentMethod.fromRequest(request.getPaymentMethod());
+
+        if (paymentMethod == PaymentMethod.YENGAPAY) {
+            if (!yengaPayService.isEnabledForCurrentStore()) {
+                throw new RuntimeException("Le paiement en ligne n'est pas disponible pour cette boutique");
+            }
+            if (!yengaPayService.isConfiguredForStore(storeId)) {
+                throw new RuntimeException("YengaPay n'est pas configuré pour cette boutique");
+            }
+        }
 
         if (fulfillment.isPickup()) {
             if (request.getCustomerName() == null || request.getCustomerName().isBlank()) {
@@ -148,6 +181,10 @@ public class OrderService {
                 .deliveryCost(fulfillment.isPickup() ? BigDecimal.ZERO : request.getDeliveryCost())
                 .distance(fulfillment.isPickup() ? null : request.getDistance())
                 .status(Order.Status.PENDING)
+                .paymentMethod(paymentMethod)
+                .paymentStatus(paymentMethod == PaymentMethod.YENGAPAY
+                        ? PaymentStatus.PENDING
+                        : PaymentStatus.UNPAID)
                 .items(new ArrayList<>())
                 .subtotal(BigDecimal.ZERO)
                 .total(BigDecimal.ZERO)
@@ -156,6 +193,7 @@ public class OrderService {
         BigDecimal subtotal = BigDecimal.ZERO;
 
         // 3. Traiter chaque article
+        int itemIndex = 0;
         for (OrderItemRequest itemRequest : request.getItems()) {
             Product product = productRepository.findById(itemRequest.getProductId())
                     .orElseThrow(() -> new RuntimeException("Produit non trouvé ID: " + itemRequest.getProductId()));
@@ -168,6 +206,13 @@ public class OrderService {
             }
             if (!product.isPurchaseAllowed()) {
                 throw new RuntimeException("Produit non disponible à la vente : " + product.getName());
+            }
+
+            if (product.isRequiresPdfForm()) {
+                MultipartFile pdf = filledPdfsByIndex.get(itemIndex);
+                if (pdf == null || pdf.isEmpty()) {
+                    throw new RuntimeException("PDF obligatoire pour : " + product.getName());
+                }
             }
 
             // Vérification stock
@@ -188,10 +233,12 @@ public class OrderService {
                     .quantity(itemRequest.getQuantity())
                     .unitPrice(product.getPrice())
                     .totalPrice(lineTotal)
+                    .pdfFieldValues(itemRequest.getPdfFieldValues())
                     .build();
 
             order.getItems().add(orderItem);
             subtotal = subtotal.add(lineTotal);
+            itemIndex++;
         }
 
         // 4. Calculs finaux et sauvegarde
@@ -206,21 +253,135 @@ public class OrderService {
         }
 
         Order savedOrder = orderRepository.save(order);
+        orderRepository.flush();
+
+        boolean pdfUpdated = false;
+        for (int i = 0; i < savedOrder.getItems().size(); i++) {
+            MultipartFile pdf = filledPdfsByIndex.get(i);
+            if (pdf == null || pdf.isEmpty()) {
+                continue;
+            }
+            OrderItem item = savedOrder.getItems().get(i);
+            try {
+                String path = privateFileStorageService.storeOrderItemPdf(
+                        pdf.getBytes(), savedOrder.getId(), item.getId());
+                item.setFilledPdfUrl(path);
+                pdfUpdated = true;
+            } catch (java.io.IOException ex) {
+                throw new RuntimeException(
+                        "Impossible d'enregistrer le PDF pour : " + item.getProduct().getName(), ex);
+            }
+        }
+        if (pdfUpdated) {
+            orderRepository.save(savedOrder);
+        }
 
         // 5. Générer le lien WhatsApp
         String whatsappLink = generateWhatsAppLink(savedOrder);
         String pickupMapsUrl = fulfillment.isPickup() ? resolveStoreMapsUrl(storeId) : null;
 
+        String yengapayCheckoutUrl = null;
+        if (paymentMethod == PaymentMethod.YENGAPAY) {
+            try {
+                YengaPayIntentResponse intent = yengaPayService.createPaymentIntent(savedOrder);
+                yengapayCheckoutUrl = intent.getCheckoutPageUrlWithPaymentToken();
+                if (intent.getId() != null) {
+                    savedOrder.setYengapayPaymentIntentId(intent.getId());
+                    orderRepository.save(savedOrder);
+                }
+            } catch (Exception ex) {
+                restoreOrderStock(savedOrder);
+                savedOrder.setStatus(Order.Status.CANCELLED);
+                savedOrder.setPaymentStatus(PaymentStatus.FAILED);
+                orderRepository.save(savedOrder);
+                throw new RuntimeException("Impossible d'initialiser le paiement YengaPay : " + ex.getMessage(), ex);
+            }
+        } else {
+            dispatchNewOrderNotifications(savedOrder);
+        }
+
+        return OrderResponse.builder()
+                .orderNumber(savedOrder.getOrderNumber())
+                .totalAmount(savedOrder.getTotal())
+                .status(savedOrder.getStatus().name())
+                .whatsappLink(whatsappLink)
+                .fulfillmentType(savedOrder.getFulfillmentType() != null ? savedOrder.getFulfillmentType().name() : "DELIVERY")
+                .pickupMapsUrl(pickupMapsUrl != null && !pickupMapsUrl.isBlank() ? pickupMapsUrl : null)
+                .paymentMethod(savedOrder.getPaymentMethod().name())
+                .paymentStatus(savedOrder.getPaymentStatus().name())
+                .yengapayCheckoutUrl(yengapayCheckoutUrl)
+                .build();
+    }
+
+    /**
+     * Confirme un paiement YengaPay (webhook DONE) et notifie l'admin.
+     */
+    @Transactional
+    public void confirmYengaPayPayment(Order order, String transactionId) {
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            return;
+        }
+        order.setPaymentStatus(PaymentStatus.PAID);
+        if (transactionId != null && !transactionId.isBlank()) {
+            order.setYengapayTransactionId(transactionId);
+        }
+        Order saved = orderRepository.save(order);
+        dispatchNewOrderNotifications(saved);
+    }
+
+    /**
+     * Annule une commande YengaPay non payée et restaure le stock.
+     */
+    @Transactional
+    public void cancelYengaPayPayment(Order order, PaymentStatus status, String note) {
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            return;
+        }
+        restoreOrderStock(order);
+        order.setPaymentStatus(status);
+        order.setStatus(Order.Status.CANCELLED);
+        orderRepository.save(order);
+        log.info("Commande YengaPay annulée {} — {}", order.getOrderNumber(), note);
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentStatusResponse getPaymentStatus(String orderNumber) {
+        Order order = orderRepository.findByOrderNumber(orderNumber)
+                .orElseThrow(() -> new RuntimeException("Commande introuvable"));
+        String whatsappLink = generateWhatsAppLink(order);
+        return PaymentStatusResponse.builder()
+                .orderNumber(order.getOrderNumber())
+                .orderStatus(order.getStatus().name())
+                .paymentMethod(order.getPaymentMethod() != null ? order.getPaymentMethod().name() : PaymentMethod.COD.name())
+                .paymentStatus(order.getPaymentStatus() != null ? order.getPaymentStatus().name() : PaymentStatus.UNPAID.name())
+                .whatsappLink(whatsappLink)
+                .build();
+    }
+
+    private void restoreOrderStock(Order order) {
+        for (OrderItem item : order.getItems()) {
+            Product product = item.getProduct();
+            if (product == null) {
+                continue;
+            }
+            product.setStock(product.getStock() + item.getQuantity());
+            productRepository.save(product);
+        }
+    }
+
+    private void dispatchNewOrderNotifications(Order savedOrder) {
         // 6. Notifications : admin (SSE + Telegram) lors d'une nouvelle commande
         String currency = appProperties.getCurrency() != null ? appProperties.getCurrency() : "FCFA";
-        Map<String, Object> notifData = Map.of(
-                "id", savedOrder.getId(),
-                "orderNumber", savedOrder.getOrderNumber(),
-                "customerName", savedOrder.getCustomerName(),
-                "total", savedOrder.getTotal(),
-                "deliveryType", savedOrder.getDeliveryType() != null ? savedOrder.getDeliveryType() : "",
-                "fulfillmentType", savedOrder.getFulfillmentType() != null ? savedOrder.getFulfillmentType().name() : "DELIVERY"
-        );
+        Map<String, Object> notifData = new HashMap<>();
+        notifData.put("id", savedOrder.getId());
+        notifData.put("orderNumber", savedOrder.getOrderNumber());
+        notifData.put("customerName", savedOrder.getCustomerName());
+        notifData.put("total", savedOrder.getTotal());
+        notifData.put("deliveryType", savedOrder.getDeliveryType() != null ? savedOrder.getDeliveryType() : "");
+        notifData.put("fulfillmentType", savedOrder.getFulfillmentType() != null ? savedOrder.getFulfillmentType().name() : "DELIVERY");
+        notifData.put("itemCustomizations", PdfFieldValuesFormatter.itemCustomizationsForNotification(savedOrder.getItems()));
+
+        final String customizationSummary = PdfFieldValuesFormatter.compactSummary(savedOrder.getItems());
 
         // IMPORTANT: ne pas mettre tous les canaux dans le même try/catch.
         // Un échec WebPush/SSE ne doit pas empêcher Telegram/FCM.
@@ -256,10 +417,20 @@ public class OrderService {
         notificationRunner.executeNotification(NotificationChannel.SSE, ord,
             () -> notificationService.notifyAdmins("new_order", notifData));
 
+        final boolean pickupOrder = savedOrder.isPickup();
+        final String webPushBody;
+        {
+            String body = "#" + ord + " — " + savedOrder.getCustomerName()
+                    + (pickupOrder ? " · Retrait" : " · Livraison");
+            if (!customizationSummary.isBlank()) {
+                body += "\n" + customizationSummary;
+            }
+            webPushBody = body;
+        }
         var rWebPushAdmin = notificationRunner.executeNotification(NotificationChannel.WEBPUSH, ord,
             () -> webPushService.notifyAdmins(
-                "🛒 Nouvelle commande",
-                "#" + ord + " — " + savedOrder.getCustomerName(),
+                pickupOrder ? "🏪 Retrait en boutique" : "🛒 Nouvelle commande",
+                webPushBody,
                 "order-" + ord
             ));
         if (rWebPushAdmin.status() == com.storeall.api.notification.NotificationResult.Status.SUCCESS) {
@@ -287,15 +458,6 @@ public class OrderService {
                 }
             }
         }
-
-        return OrderResponse.builder()
-                .orderNumber(savedOrder.getOrderNumber())
-                .totalAmount(savedOrder.getTotal())
-                .status(savedOrder.getStatus().name())
-                .whatsappLink(whatsappLink)
-                .fulfillmentType(savedOrder.getFulfillmentType() != null ? savedOrder.getFulfillmentType().name() : "DELIVERY")
-                .pickupMapsUrl(pickupMapsUrl != null && !pickupMapsUrl.isBlank() ? pickupMapsUrl : null)
-                .build();
     }
 
     private String resolveStoreMapsUrl(Long storeId) {
@@ -368,12 +530,23 @@ public class OrderService {
             message.append("- ").append(item.getQuantity()).append("x ")
                     .append(item.getProduct().getName())
                     .append(" (").append(item.getTotalPrice()).append(" ").append(currency).append(")\n");
+            PdfFieldValuesFormatter.appendPlainTextItemDetails(
+                    message,
+                    item.getProduct().getName(),
+                    PdfFieldValuesFormatter.parse(item.getPdfFieldValues()));
         }
 
         message.append("\n*TOTAL: ").append(order.getTotal()).append(" ").append(currency).append("*").append("\n\n");
 
         if (order.getCustomerNotes() != null && !order.getCustomerNotes().isEmpty()) {
             message.append("Notes: ").append(order.getCustomerNotes());
+        }
+
+        if (order.getConfirmationCode() != null && !order.getConfirmationCode().isBlank()) {
+            message.append("\n\n🔑 Code de confirmation : ").append(order.getConfirmationCode());
+            if (pickup) {
+                message.append(" (à présenter en boutique)");
+            }
         }
 
         try {
@@ -398,25 +571,9 @@ public class OrderService {
 
         StringBuilder message = new StringBuilder();
         message.append("Bonjour,\n\n");
-        message.append("Votre commande #").append(order.getOrderNumber()).append(" sur ").append(storeName).append(" est actuellement : *").append(getStatusLabel(order.getStatus())).append("*\n\n");
-
-        switch (order.getStatus()) {
-            case PENDING:
-            case SHIPPED: // Using SHIPPED as "En cours" equivalent for now
-                message.append("Votre commande est en cours de préparation et sera bientôt livrée.");
-                break;
-            case DELIVERED:
-                message.append("Votre commande a été livrée avec succès. Merci de votre confiance !");
-                break;
-            case CANCELLED:
-                message.append("Votre commande a été annulée. Pour plus d'informations, contactez-nous.");
-                break;
-            case CONFIRMED:
-            default:
-                message.append("Nous vous tiendrons informé de l'évolution de votre commande.");
-                break;
-        }
-
+        message.append("Votre commande #").append(order.getOrderNumber()).append(" sur ").append(storeName)
+            .append(" est actuellement : *").append(statusLabelFor(order)).append("*\n\n");
+        appendCustomerStatusWhatsAppBody(message, order);
         message.append("\n\n").append(storeName).append("\n").append(storePhone);
 
         // Nettoyage du numéro de téléphone du client (suppression des espaces, etc.)
@@ -429,20 +586,95 @@ public class OrderService {
         }
     }
 
-    private String getStatusLabel(Order.Status status) {
+    private String resolveStoreDisplayName() {
+        return appSettingService.getSettingValue("store_name")
+            .orElse(appProperties.getStoreName() != null ? appProperties.getStoreName() : "STORE");
+    }
+
+    private String statusLabelFor(Order order) {
+        return statusLabelFor(order.getStatus(), order.isPickup());
+    }
+
+    private String statusLabelFor(Order.Status status, boolean pickup) {
         return switch (status) {
+            case PENDING -> "En attente";
+            case CONFIRMED -> "Confirmée";
+            case SHIPPED -> "En cours de livraison";
+            case DELIVERED -> pickup ? "Récupérée" : "Livrée";
+            case CANCELLED -> "Annulée";
+            case REJECTED -> "Rejetée";
+            default -> status.name();
+        };
+    }
+
+    private void appendCustomerStatusWhatsAppBody(StringBuilder message, Order order) {
+        boolean pickup = order.isPickup();
+        switch (order.getStatus()) {
+            case CONFIRMED -> {
+                if (pickup) {
+                    message.append("Bonne nouvelle ! Votre commande est confirmée.\n\n")
+                        .append("Présentez-vous en boutique pour récupérer votre commande.");
+                    if (order.getConfirmationCode() != null && !order.getConfirmationCode().isBlank()) {
+                        message.append("\n\nCode à présenter en boutique : ").append(order.getConfirmationCode());
+                    }
+                    Long storeId = order.getStore() != null ? order.getStore().getId() : StoreContext.getStoreIdOrNull();
+                    String maps = resolveStoreMapsUrl(storeId);
+                    if (!maps.isBlank()) {
+                        message.append("\n\nLieu de retrait : ").append(maps);
+                    }
+                } else {
+                    message.append("Bonne nouvelle ! Votre commande est confirmée.\n\n")
+                        .append("Elle est en cours de préparation et sera bientôt livrée.");
+                    if (order.getConfirmationCode() != null && !order.getConfirmationCode().isBlank()) {
+                        message.append("\n\nCode de confirmation : ").append(order.getConfirmationCode());
+                    }
+                }
+            }
+            case SHIPPED -> {
+                if (!pickup) {
+                    message.append("Votre commande est en cours de livraison.\n\n")
+                        .append("Notre livreur est en route. Tenez-vous prêt !");
+                }
+            }
+            case DELIVERED -> {
+                if (pickup) {
+                    message.append("Votre commande a été récupérée en boutique.\n\nMerci de votre confiance !");
+                } else {
+                    message.append("Votre commande a été livrée avec succès.\n\nMerci de votre confiance !");
+                }
+            }
+            case CANCELLED, REJECTED ->
+                message.append("Votre commande a été annulée. Pour plus d'informations, contactez-nous.");
             case PENDING ->
-                "En attente";
-            case CONFIRMED ->
-                "Confirmée";
-            case SHIPPED ->
-                "En cours de livraison";
-            case DELIVERED ->
-                "Livrée";
-            case CANCELLED ->
-                "Annulée";
+                message.append("Votre commande est en attente de validation.");
             default ->
-                status.name();
+                message.append("Nous vous tiendrons informé de l'évolution de votre commande.");
+        }
+    }
+
+    private String buildCustomerPushTitle(Order.Status status, boolean pickup) {
+        return switch (status) {
+            case CONFIRMED -> "✅ Commande confirmée";
+            case DELIVERED -> pickup ? "✅ Commande récupérée" : "✅ Commande livrée";
+            case REJECTED -> "❌ Commande rejetée";
+            case CANCELLED -> "❌ Commande annulée";
+            default -> "Mise à jour commande";
+        };
+    }
+
+    private String buildCustomerPushBody(Order order, Order.Status status) {
+        boolean pickup = order.isPickup();
+        return switch (status) {
+            case CONFIRMED -> pickup
+                ? "Votre commande #" + order.getOrderNumber() + " est confirmée. Venez en boutique avec votre code"
+                    + (order.getConfirmationCode() != null ? " (" + order.getConfirmationCode() + ")" : "") + "."
+                : "Votre commande #" + order.getOrderNumber() + " a été confirmée et est en cours de préparation.";
+            case DELIVERED -> pickup
+                ? "Votre commande #" + order.getOrderNumber() + " a été récupérée en boutique. Merci !"
+                : "Votre commande #" + order.getOrderNumber() + " a été livrée. Merci !";
+            case REJECTED -> "Votre commande #" + order.getOrderNumber() + " a été rejetée.";
+            case CANCELLED -> "Votre commande #" + order.getOrderNumber() + " a été annulée.";
+            default -> "Votre commande #" + order.getOrderNumber() + " a été mise à jour.";
         };
     }
 
@@ -468,6 +700,22 @@ public class OrderService {
         Long storeId = StoreContext.getStoreIdOrNull();
         return orderRepository.findByIdAndStoreId(id, storeId)
             .orElseThrow(() -> new RuntimeException("Commande introuvable ID: " + id));
+    }
+
+    /**
+     * Stream du PDF rempli lié à une ligne de commande (admin).
+     */
+    @Transactional(readOnly = true)
+    public Resource getOrderItemPdfResource(Long orderId, Long itemId) {
+        Order order = getOrderById(orderId);
+        OrderItem item = order.getItems().stream()
+                .filter(i -> i.getId().equals(itemId))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Ligne de commande introuvable ID: " + itemId));
+        if (item.getFilledPdfUrl() == null || item.getFilledPdfUrl().isBlank()) {
+            throw new RuntimeException("Aucun PDF enregistré pour cette ligne.");
+        }
+        return privateFileStorageService.loadAsResource(item.getFilledPdfUrl());
     }
 
     /**
@@ -510,6 +758,8 @@ public class OrderService {
             statusData.put("status", newStatus.name());
             statusData.put("actorUsername", actorUsername == null ? "" : actorUsername);
             statusData.put("actorRole", actorRole == null ? "" : actorRole);
+            statusData.put("fulfillmentType",
+                savedOrder.getFulfillmentType() != null ? savedOrder.getFulfillmentType().name() : "DELIVERY");
             final String ord = savedOrder.getOrderNumber();
             notificationRunner.executeNotification(NotificationChannel.SSE, ord,
                 () -> notificationService.notifyAdmins("order_status", statusData));
@@ -583,22 +833,16 @@ public class OrderService {
                 }
             }
 
-            // Notification push client (CONFIRMED / REJECTED / CANCELLED)
+            // Notification push client (CONFIRMED / DELIVERED / REJECTED / CANCELLED)
             if (newStatus == Order.Status.CONFIRMED
+                || newStatus == Order.Status.DELIVERED
                 || newStatus == Order.Status.CANCELLED
                 || newStatus == Order.Status.REJECTED) {
                 try {
-                    String pushTitle = (newStatus == Order.Status.CONFIRMED)
-                        ? "✅ Commande confirmée"
-                        : (newStatus == Order.Status.REJECTED)
-                            ? "❌ Commande rejetée"
-                            : "❌ Commande annulée";
-                    String pushBody = (newStatus == Order.Status.CONFIRMED)
-                        ? "Votre commande #" + savedOrder.getOrderNumber() + " a été confirmée et est en cours de préparation."
-                        : (newStatus == Order.Status.REJECTED)
-                            ? "Votre commande #" + savedOrder.getOrderNumber() + " a été rejetée."
-                            : "Votre commande #" + savedOrder.getOrderNumber() + " a été annulée.";
-                    webPushService.notifyCustomer(savedOrder.getOrderNumber(), pushTitle, pushBody);
+                    webPushService.notifyCustomer(
+                        savedOrder.getOrderNumber(),
+                        buildCustomerPushTitle(newStatus, savedOrder.isPickup()),
+                        buildCustomerPushBody(savedOrder, newStatus));
                 } catch (Exception e) {
                     log.warn("[NOTIF] channel=WEBPUSH order={} status=FAIL error={}",
                         savedOrder.getOrderNumber(), e.toString());
@@ -715,33 +959,17 @@ public class OrderService {
         String phoneInput = (phoneNumber != null && !phoneNumber.isBlank()) ? phoneNumber : order.getCustomerPhone();
         String phone = formatPhoneNumberForWhatsApp(phoneInput);
 
+        String storeName = resolveStoreDisplayName();
         StringBuilder message = new StringBuilder();
         message.append("Bonjour,\n\n");
-        // N° remplace # pour éviter que le navigateur mobile interprète %23 comme un fragment d'URL
         message.append("Votre commande N° ").append(order.getOrderNumber());
-        if (order.getConfirmationCode() != null) {
+        if (order.getConfirmationCode() != null && !order.getConfirmationCode().isBlank()) {
             message.append(" (Code: ").append(order.getConfirmationCode()).append(")");
         }
-        // Pas de * autour du statut — évite les truncations WhatsApp sur mobile
-        message.append(" sur SUCRE STORE est actuellement : ").append(getStatusLabel(order.getStatus())).append("\n\n");
-
-        // Message personnalisé selon le statut (texte plain — sans markdown WhatsApp)
-        switch (order.getStatus()) {
-            case CONFIRMED -> message.append("Bonne nouvelle ! Votre commande est confirmee.\n\n")
-                .append("Elle est en cours de preparation et sera bientot livree.")
-                .append(order.getConfirmationCode() != null
-                    ? "\n\nCode de confirmation : " + order.getConfirmationCode() : "");
-            case SHIPPED -> message.append("Votre commande est en cours de livraison.\n\n")
-                .append("Notre livreur est en route. Tenez-vous pret !");
-            case DELIVERED -> message.append("Votre commande a ete livree avec succes.\n\n")
-                .append("Merci pour votre confiance. A tres bientot sur SUCRE STORE !");
-            case CANCELLED -> message.append("Nous avons le regret de vous informer que votre commande a ete annulee.\n\n")
-                .append("Nous nous excusons pour la gene occasionnee.\n")
-                .append("Pour toute information, n'hesitez pas a nous contacter.");
-            default -> message.append("Nous vous tiendrons informe de l'evolution de votre commande.");
-        }
-
-        message.append("\n\nSUCRE STORE\n").append(whatsappNumber);
+        message.append(" sur ").append(storeName).append(" est actuellement : ")
+            .append(statusLabelFor(order)).append("\n\n");
+        appendCustomerStatusWhatsAppBody(message, order);
+        message.append("\n\n").append(storeName).append("\n").append(whatsappNumber);
 
         String encodedMessage = URLEncoder.encode(message.toString(), StandardCharsets.UTF_8);
         return "https://wa.me/" + phone + "?text=" + encodedMessage;
@@ -991,6 +1219,10 @@ public class OrderService {
             if (fcmService != null) {
                 fcmService.notifyAdminsOrderStatus(saved, actorUsername);
             }
+            webPushService.notifyCustomer(
+                saved.getOrderNumber(),
+                buildCustomerPushTitle(Order.Status.DELIVERED, true),
+                buildCustomerPushBody(saved, Order.Status.DELIVERED));
         } catch (Exception ignored) {}
 
         return saved;
@@ -1028,17 +1260,22 @@ public class OrderService {
         });
 
         try {
-            Map<String, Object> statusData = Map.of(
-                "id", saved.getId(),
-                "orderNumber", saved.getOrderNumber(),
-                "status", saved.getStatus().name(),
-                "actorUsername", username,
-                "actorRole", actorRoleName
-            );
+            Map<String, Object> statusData = new java.util.HashMap<>();
+            statusData.put("id", saved.getId());
+            statusData.put("orderNumber", saved.getOrderNumber());
+            statusData.put("status", saved.getStatus().name());
+            statusData.put("actorUsername", username);
+            statusData.put("actorRole", actorRoleName);
+            statusData.put("fulfillmentType",
+                saved.getFulfillmentType() != null ? saved.getFulfillmentType().name() : "DELIVERY");
             notificationService.notifyAdmins("order_status", statusData);
             if (fcmService != null) {
                 fcmService.notifyAdminsOrderStatus(saved, username);
             }
+            webPushService.notifyCustomer(
+                saved.getOrderNumber(),
+                buildCustomerPushTitle(Order.Status.DELIVERED, false),
+                buildCustomerPushBody(saved, Order.Status.DELIVERED));
         } catch (Exception ignored) {}
 
         return saved;

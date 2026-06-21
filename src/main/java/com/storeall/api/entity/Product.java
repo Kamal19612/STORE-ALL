@@ -145,6 +145,19 @@ public class Product {
     private boolean purchaseAllowed = true;
 
     /**
+     * Chemin relatif du PDF modèle (stockage privé, ex: products-pdf/{uuid}.pdf).
+     */
+    @Column(name = "template_pdf_url", length = 2048)
+    private String templatePdfUrl;
+
+    /**
+     * Le client doit remplir le PDF avant d'ajouter au panier.
+     */
+    @Column(name = "requires_pdf_form", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean requiresPdfForm = false;
+
+    /**
      * Catégorie parente
      */
     @ManyToOne(fetch = FetchType.EAGER)

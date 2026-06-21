@@ -1,7 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { Suspense, lazy, useEffect, useLayoutEffect } from "react";
+import { Suspense, lazy, useLayoutEffect } from "react";
+import { reloadIfStaleModuleError } from "./utils/reloadOnStaleModule";
 
 // Désactiver le scroll restoration natif du navigateur une seule fois au démarrage.
 // Sans ça, le navigateur mobile restaure la position scrollée de l'URL précédente.
@@ -40,21 +41,11 @@ function ScrollToTop() {
 const lazyWithRetry = (factory) =>
   lazy(() =>
     factory().catch((err) => {
-      const isChunkError =
-        err?.name === "TypeError" ||
-        err?.message?.includes("Failed to fetch") ||
-        err?.message?.includes("is not a valid JavaScript MIME type") ||
-        err?.message?.includes("Importing a module script failed");
-      if (isChunkError) {
-        const lastReload = parseInt(localStorage.getItem("chunk_reload_at") || "0");
-        if (Date.now() - lastReload > 15000) {
-          localStorage.setItem("chunk_reload_at", String(Date.now()));
-          window.location.reload();
-          return new Promise(() => {});
-        }
+      if (reloadIfStaleModuleError(err)) {
+        return new Promise(() => {});
       }
       throw err;
-    })
+    }),
   );
 import "./hooks/useInstallPWA"; // import eager pour enregistrer beforeinstallprompt tôt
 
@@ -66,12 +57,14 @@ import ManagerLayout from "./layouts/ManagerLayout";
 import DeliveryLayout from "./layouts/DeliveryLayout";
 import PrivateRoute from "./components/PrivateRoute";
 import ManifestSwitcher from "./components/ManifestSwitcher";
+import SuperAdminStoreForm from "./pages/admin/super/SuperAdminStoreForm";
 
 // Components
 // Pages - Code Splitting (Lazy Load)
 const StorefrontVitrinePage = lazyWithRetry(() => import("./components/storefront/StorefrontVitrinePage"));
 const Checkout = lazyWithRetry(() => import("./pages/public/Checkout"));
 const OrderFulfillment = lazyWithRetry(() => import("./pages/public/OrderFulfillment"));
+const PaymentReturn = lazyWithRetry(() => import("./pages/public/PaymentReturn"));
 const Login = lazyWithRetry(() => import("./pages/Login"));
 
 // Admin Pages
@@ -97,7 +90,6 @@ const OrdersDiagnostic = lazyWithRetry(() => import("./pages/admin/OrdersDiagnos
 const SuperAdminOrders = lazyWithRetry(() => import("./pages/admin/super/SuperAdminOrders"));
 const SuperAdminProducts = lazyWithRetry(() => import("./pages/admin/super/SuperAdminProducts"));
 const SuperAdminManagers = lazyWithRetry(() => import("./pages/admin/super/SuperAdminManagers"));
-const SuperAdminStoreForm = lazyWithRetry(() => import("./pages/admin/super/SuperAdminStoreForm"));
 const SuperAdminSettings = lazyWithRetry(() => import("./pages/admin/super/SuperAdminSettings"));
 
 // Delivery Pages
@@ -131,15 +123,6 @@ function RedirectLegacyCheckout() {
 }
 
 function App() {
-  useEffect(() => {
-    // Enregistrement du Service Worker
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch((err) => {
-        console.warn("[SW] Échec enregistrement:", err);
-      });
-    }
-  }, []);
-
   return (
     <Router>
       <ScrollToTop />
@@ -302,6 +285,7 @@ function App() {
                 />
                 <Route path="commande" element={<OrderFulfillment />} />
                 <Route path="checkout" element={<Checkout />} />
+                <Route path="paiement/retour" element={<PaymentReturn />} />
               </Route>
             </Route>
           </Routes>

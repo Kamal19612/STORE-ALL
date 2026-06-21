@@ -7,6 +7,21 @@ import { getExplicitStoreCode } from "../services/store/storeContext";
 
 // ─── Audio ────────────────────────────────────────────────────────────────────
 
+function formatItemCustomizations(itemCustomizations) {
+  if (!Array.isArray(itemCustomizations) || itemCustomizations.length === 0) {
+    return "";
+  }
+  return itemCustomizations
+    .map((item) => {
+      const fields = Array.isArray(item.fields) ? item.fields : [];
+      if (fields.length === 0) return "";
+      const lines = fields.map((f) => `  • ${f.label || f.key}: ${f.value ?? ""}`);
+      return `📝 ${item.productName || "Produit"}\n${lines.join("\n")}`;
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
 let sharedAudioCtx = null;
 
 function getAudioContext() {
@@ -107,22 +122,32 @@ export function useNotifications(role) {
     es.addEventListener("new_order", (e) => {
       try {
         const data = JSON.parse(e.data);
-        const typeLabel =
-          data.deliveryType === "EXPRESS" ? "⚡ Express" :
-          data.deliveryType === "PROGRAMMER" ? "🕐 Programmée" : "";
+        const isPickup = data.fulfillmentType === "PICKUP";
+        const typeLabel = isPickup
+          ? "🏪 Retrait"
+          : data.deliveryType === "EXPRESS"
+            ? "⚡ Express"
+            : data.deliveryType === "PROGRAMMER"
+              ? "🕐 Programmée"
+              : "";
+        const orderTitle = isPickup ? "🏪 Retrait en boutique" : "🛒 Nouvelle commande";
+
+        const customizationLines = formatItemCustomizations(data.itemCustomizations);
+        const baseLine = `${orderTitle} #${data.orderNumber}\n${data.customerName}${typeLabel ? " · " + typeLabel : ""}`;
+        const toastMessage = customizationLines
+          ? `${baseLine}\n\n${customizationLines}`
+          : baseLine;
 
         playNotificationSound("order");
 
-        toast.info(
-          `🛒 Nouvelle commande #${data.orderNumber}\n${data.customerName}${typeLabel ? " · " + typeLabel : ""}`,
-          { autoClose: 10000, style: { whiteSpace: "pre-line" } }
-        );
+        toast.info(toastMessage, { autoClose: 12000, style: { whiteSpace: "pre-line" } });
 
         // Notification système uniquement si l'onglet est en arrière-plan
         // (évite le doublon avec le Web Push qui arrive aussi du backend)
         if (document.hidden) {
-          sendBrowserNotification("🛒 Nouvelle commande", {
-            body: `#${data.orderNumber} — ${data.customerName}${typeLabel ? "\n" + typeLabel : ""}`,
+          const bodyBase = `#${data.orderNumber} — ${data.customerName}${typeLabel ? "\n" + typeLabel : ""}`;
+          sendBrowserNotification(orderTitle, {
+            body: customizationLines ? `${bodyBase}\n\n${customizationLines}` : bodyBase,
             tag: `order-${data.orderNumber}`,
             requireInteraction: true,
           });
@@ -163,6 +188,7 @@ export function useNotifications(role) {
       try {
         const data = JSON.parse(e.data);
         // Exemple: "Commande #ORD-... confirmée"
+        const isPickup = data.fulfillmentType === "PICKUP";
         const statusLabel = data.status === "CONFIRMED"
           ? "confirmée"
           : data.status === "CANCELLED"
@@ -172,7 +198,7 @@ export function useNotifications(role) {
               : data.status === "SHIPPED"
                 ? "en livraison"
                 : data.status === "DELIVERED"
-                  ? "livrée"
+                  ? (isPickup ? "récupérée" : "livrée")
                   : String(data.status || "").toLowerCase();
 
         toast.info(

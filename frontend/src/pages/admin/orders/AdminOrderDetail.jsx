@@ -13,12 +13,27 @@ import {
   Truck,
   CheckCircle,
   XCircle,
+  FileText,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import adminOrderService from "../../../services/adminOrderService";
 import useAuthStore from "../../../store/authStore";
 import { useStaffBasePath } from "../../../hooks/useStaffBasePath";
 import ProductImage from "../../../components/product/ProductImage";
+
+function parsePdfFieldSummary(pdfFieldValues) {
+  if (!pdfFieldValues) return [];
+  try {
+    const parsed = typeof pdfFieldValues === "string" ? JSON.parse(pdfFieldValues) : pdfFieldValues;
+    if (!parsed || typeof parsed !== "object") return [];
+    return Object.entries(parsed).map(([key, value]) => ({
+      key,
+      value: value == null ? "" : String(value),
+    }));
+  } catch {
+    return [];
+  }
+}
 
 const AdminOrderDetail = () => {
   const staffBase = useStaffBasePath();
@@ -275,11 +290,14 @@ const AdminOrderDetail = () => {
               </div>
 
               <div className="divide-y divide-gray-100 dark:divide-white/5">
-                {order.items.map((item) => (
+                {order.items.map((item) => {
+                  const pdfSummary = parsePdfFieldSummary(item.pdfFieldValues);
+                  return (
                   <div
                     key={item.id}
-                    className="p-3 sm:p-5 flex flex-row sm:items-center gap-3 sm:gap-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                    className="p-3 sm:p-5 flex flex-col gap-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                   >
+                    <div className="flex flex-row sm:items-center gap-3 sm:gap-4">
                     <div className="h-16 w-16 bg-white dark:bg-[#1c191a] rounded-lg border border-gray-200 dark:border-white/10 overflow-hidden shrink-0 p-1">
                       <ProductImage
                         product={item.product}
@@ -309,8 +327,41 @@ const AdminOrderDetail = () => {
                         </span>
                       </p>
                     </div>
+                    </div>
+
+                    {(item.filledPdfUrl || pdfSummary.length > 0) && (
+                      <div className="rounded-lg border border-primary/20 bg-primary/5 dark:bg-primary/10 px-3 py-2.5 text-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-bold text-gray-800 dark:text-white flex items-center gap-1.5">
+                            <FileText className="h-4 w-4 text-primary" />
+                            Personnalisation PDF
+                          </span>
+                          {item.filledPdfUrl ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                adminOrderService.openOrderItemPdf(id, item.id, managerStoreId)
+                              }
+                              className="text-xs font-bold text-primary hover:underline"
+                            >
+                              Voir le PDF rempli
+                            </button>
+                          ) : null}
+                        </div>
+                        {pdfSummary.length > 0 ? (
+                          <dl className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
+                            {pdfSummary.map(({ key, value }) => (
+                              <div key={key} className="flex gap-1 min-w-0">
+                                <dt className="font-semibold shrink-0">{key}:</dt>
+                                <dd className="truncate">{value || "—"}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
-                ))}
+                );})}
               </div>
 
               <div className="bg-gray-50 dark:bg-[#1c191a]/50 px-3 sm:px-6 py-3 sm:py-5 border-t border-gray-200 dark:border-white/10">

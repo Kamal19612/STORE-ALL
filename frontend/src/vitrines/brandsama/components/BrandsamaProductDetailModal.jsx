@@ -6,7 +6,11 @@ import { useStorefrontBranding } from "../../../context/StorefrontBrandingContex
 import ProductImageCarousel from "../../../components/product/ProductImageCarousel";
 import { getProductCopySections } from "../../../utils/productCopy";
 import { buildBrandsamaThemeStyle } from "../utils/brandsamaThemeStyle";
-import { parseBrandsamaVitrineConfig } from "../utils/parseVitrineConfig";
+import {
+  needsPdfBeforeCart,
+  requestAddProductToCart,
+  requestToggleProductInCart,
+} from "../../../utils/productCartFlow";
 
 export default function BrandsamaProductDetailModal({ product, onClose }) {
   const { displayName, vitrineConfig } = useStorefrontBranding();
@@ -17,7 +21,7 @@ export default function BrandsamaProductDetailModal({ product, onClose }) {
       ),
     [vitrineConfig, displayName],
   );
-  const addItem = useCartStore((state) => state.addItem);
+  const isProductInCart = useCartStore((state) => state.isProductInCart);
   const items = useCartStore((state) => state.items);
 
   useEffect(() => {
@@ -42,7 +46,8 @@ export default function BrandsamaProductDetailModal({ product, onClose }) {
   const canPurchase = isPurchasable;
   const isRuptureOnly =
     !isArchived && purchaseAllowed && stockNum === 0 && !isPurchasable;
-  const isInCart = items.some((item) => item.id === product.id);
+  const requiresPdf = needsPdfBeforeCart(product);
+  const isInCart = !requiresPdf && isProductInCart(product.id);
 
   const formatPrice = (price) => {
     const n = price != null && price !== "" ? Number(price) : 0;
@@ -53,12 +58,12 @@ export default function BrandsamaProductDetailModal({ product, onClose }) {
   const handleAddToCart = (e) => {
     e.stopPropagation();
     if (!canPurchase) return;
-    if (isInCart) {
-      useCartStore.getState().removeItem(product.id);
-    } else {
-      addItem(product);
-      toast.success("✓ Produit ajouté ! Vérifiez votre panier");
+    if (requiresPdf) {
+      requestAddProductToCart(product);
+      return;
     }
+    const result = requestToggleProductInCart(product);
+    if (result === "added") toast.success("✓ Produit ajouté ! Vérifiez votre panier");
   };
 
   const handleOverlayClick = (e) => {

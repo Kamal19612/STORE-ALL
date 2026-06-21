@@ -4,6 +4,11 @@ import { ArrowLeft, ShoppingCart, Check } from "lucide-react";
 import { toast } from "react-toastify";
 import productService from "../../services/productService";
 import useCartStore from "../../store/cartStore";
+import {
+  needsPdfBeforeCart,
+  requestAddProductToCart,
+  requestToggleProductInCart,
+} from "../../utils/productCartFlow";
 import ProductImageCarousel from "../../components/product/ProductImageCarousel";
 import { useStorefrontHref } from "../../hooks/useStorefrontHref";
 import { getProductCopySections } from "../../utils/productCopy";
@@ -16,11 +21,8 @@ const ProductDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const addItem = useCartStore((state) => state.addItem);
-  const removeItem = useCartStore((state) => state.removeItem);
+  const isProductInCart = useCartStore((state) => state.isProductInCart);
   const items = useCartStore((state) => state.items);
-
-  const isInCart = items.some((item) => item.id === parseInt(id));
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -38,6 +40,9 @@ const ProductDetail = () => {
     fetchProduct();
   }, [id]);
 
+  const requiresPdf = product ? needsPdfBeforeCart(product) : false;
+  const isInCart = product && !requiresPdf && isProductInCart(product.id);
+
   const handleToggleCart = () => {
     const purchasable =
       typeof product.available === "boolean"
@@ -46,13 +51,15 @@ const ProductDetail = () => {
           (product.purchaseAllowed !== false) &&
           (Number(product.stock) || 0) > 0;
     if (!purchasable) return;
-    if (isInCart) {
-      removeItem(product.id);
-      toast.info("Produit retiré du panier");
-    } else {
-      addItem(product);
-      toast.success("Produit ajouté au panier ! 🛒");
+
+    if (requiresPdf) {
+      requestAddProductToCart(product);
+      return;
     }
+
+    const result = requestToggleProductInCart(product);
+    if (result === "added") toast.success("Produit ajouté au panier ! 🛒");
+    else if (result === "removed") toast.info("Produit retiré du panier");
   };
 
   if (loading) {

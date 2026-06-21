@@ -12,7 +12,8 @@ import {
   getSuperApplicationSummary,
 } from "../../../services/adminSupervisionService";
 import ImportStoresSheetModal from "../../../components/admin/ImportStoresSheetModal";
-import VitrineTemplatePicker, { VitrineTemplatePreviewPanel } from "../../../components/admin/VitrineTemplatePicker";
+import VitrineTemplatePicker from "../../../components/admin/VitrineTemplatePicker";
+import VitrineTemplatePreviewPanel from "../../../components/admin/VitrineTemplatePreviewPanel";
 import VitrineAlibabaConfigFields from "../../../components/admin/VitrineAlibabaConfigFields";
 import VitrineBrandsamaConfigFields from "../../../components/admin/VitrineBrandsamaConfigFields";
 import { getVitrineTemplateOption, VITRINE_TEMPLATE_DEFAULT } from "../../../config/vitrineTemplates";

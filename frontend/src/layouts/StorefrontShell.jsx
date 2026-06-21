@@ -2,7 +2,10 @@ import { useEffect, useLayoutEffect } from "react";
 import { Outlet, useParams } from "react-router-dom";
 
 import useCartStore from "../store/cartStore";
+import usePdfFormModalStore from "../store/pdfFormModalStore";
 import { setActiveStoreCode } from "../services/store/storeContext";
+import ProductPdfFormModal from "../components/product/ProductPdfFormModal";
+import ProductPdfFormErrorBoundary from "../components/product/ProductPdfFormErrorBoundary";
 
 /**
  * Enveloppe des routes {@code /:storeCode/…} : tenant localStorage + panier alignés sur l’URL.
@@ -41,5 +44,30 @@ export default function StorefrontShell() {
     };
   }, []);
 
-  return <Outlet />;
+  return (
+    <>
+      <Outlet />
+      <ProductPdfFormErrorBoundary
+        fallback={(message) => {
+          const close = usePdfFormModalStore.getState().close;
+          return (
+            <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/50 p-4">
+              <div className="bg-white rounded-xl p-6 max-w-md shadow-xl">
+                <p className="text-red-700 text-sm mb-4">{message}</p>
+                <button
+                  type="button"
+                  onClick={close}
+                  className="w-full py-2 rounded-lg bg-gray-900 text-white font-bold text-sm"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+          );
+        }}
+      >
+        <ProductPdfFormModal />
+      </ProductPdfFormErrorBoundary>
+    </>
+  );
 }

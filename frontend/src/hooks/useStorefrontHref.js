@@ -24,6 +24,8 @@ export function useStorefrontHref() {
       fulfillment: `${base}/commande`,
       /** Page checkout (livraison) */
       checkout: `${base}/checkout`,
+      /** Retour après paiement YengaPay */
+      paymentReturn: `${base}/paiement/retour`,
       cart: `${base}/cart`,
       products: `${base}/products`,
     };

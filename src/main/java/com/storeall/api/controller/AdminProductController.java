@@ -29,6 +29,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.storeall.api.dto.ProductRequest;
 import com.storeall.api.dto.ProductResponse;
 import com.storeall.api.service.FileStorageService;
+import com.storeall.api.service.ProductPdfService;
 import com.storeall.api.service.ProductService;
 
 /**
@@ -46,6 +47,9 @@ public class AdminProductController {
 
     @Autowired
     private FileStorageService fileStorageService;
+
+    @Autowired
+    private ProductPdfService productPdfService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -73,7 +77,8 @@ public class AdminProductController {
             @RequestPart("product") String productJson,
             @RequestPart(value = "mainImage", required = false) MultipartFile mainImageFile,
             @RequestPart(value = "image", required = false) MultipartFile legacyImageFile,
-            @RequestPart(value = "secondaryImages", required = false) List<MultipartFile> secondaryImageFiles)
+            @RequestPart(value = "secondaryImages", required = false) List<MultipartFile> secondaryImageFiles,
+            @RequestPart(value = "templatePdf", required = false) MultipartFile templatePdfFile)
             throws IOException {
 
         ProductRequest request = objectMapper.readValue(productJson, ProductRequest.class);
@@ -94,7 +99,12 @@ public class AdminProductController {
 
         List<String> secondaryUrls = buildSecondaryImageUrls(secondaryImageFiles);
 
-        return ResponseEntity.ok(productService.createProduct(request, imageUrl, secondaryUrls));
+        String templatePdfPath = null;
+        if (templatePdfFile != null && !templatePdfFile.isEmpty()) {
+            templatePdfPath = productPdfService.storeAndValidateTemplate(templatePdfFile);
+        }
+
+        return ResponseEntity.ok(productService.createProduct(request, imageUrl, secondaryUrls, templatePdfPath));
     }
 
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -103,7 +113,8 @@ public class AdminProductController {
             @RequestPart("product") String productJson,
             @RequestPart(value = "mainImage", required = false) MultipartFile mainImageFile,
             @RequestPart(value = "image", required = false) MultipartFile legacyImageFile,
-            @RequestPart(value = "secondaryImages", required = false) List<MultipartFile> secondaryImageFiles)
+            @RequestPart(value = "secondaryImages", required = false) List<MultipartFile> secondaryImageFiles,
+            @RequestPart(value = "templatePdf", required = false) MultipartFile templatePdfFile)
             throws IOException {
 
         ProductRequest request = objectMapper.readValue(productJson, ProductRequest.class);
@@ -120,7 +131,13 @@ public class AdminProductController {
 
         List<String> newSecondaryUrls = buildSecondaryImageUrls(secondaryImageFiles);
 
-        return ResponseEntity.ok(productService.updateProduct(id, request, imageUrl, newSecondaryUrls));
+        String templatePdfPath = null;
+        if (templatePdfFile != null && !templatePdfFile.isEmpty()) {
+            templatePdfPath = productPdfService.storeAndValidateTemplate(templatePdfFile);
+        }
+
+        return ResponseEntity.ok(productService.updateProduct(
+                id, request, imageUrl, newSecondaryUrls, templatePdfPath, request.isRemoveTemplatePdf()));
     }
 
     @DeleteMapping("/{id}")

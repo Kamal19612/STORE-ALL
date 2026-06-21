@@ -162,6 +162,9 @@ public class ProductService {
                     && product.isActive())
                 .active(product.isActive()) // Mappage statut actif réel
                 .created(false) // Par défaut false, surchargé lors de l'import
+                .requiresPdfForm(product.isRequiresPdfForm())
+                .hasPdfTemplate(product.getTemplatePdfUrl() != null && !product.getTemplatePdfUrl().isBlank())
+                .templatePdfName(productPdfService.templateDisplayName(product))
                 .build();
     }
 
@@ -221,13 +224,21 @@ public class ProductService {
     @Autowired
     private com.storeall.api.repository.CategoryRepository categoryRepository;
 
+    @Autowired
+    private ProductPdfService productPdfService;
+
     /**
      * Crée un nouveau produit.
      */
     @Transactional
     public ProductResponse createProduct(com.storeall.api.dto.ProductRequest request, String imageUrl,
-            List<String> secondaryImageUrls) {
+            List<String> secondaryImageUrls, String templatePdfPath) {
         Long storeId = StoreContext.getStoreIdOrNull();
+        boolean requiresPdf = request.isRequiresPdfForm() || (templatePdfPath != null && !templatePdfPath.isBlank());
+        if (requiresPdf && (templatePdfPath == null || templatePdfPath.isBlank())) {
+            throw new RuntimeException("Un PDF modèle est obligatoire si le formulaire PDF est activé.");
+        }
+
         Product product = Product.builder()
                 .store(com.storeall.api.entity.Store.builder().id(storeId).build())
                 .name(request.getName())
@@ -242,6 +253,8 @@ public class ProductService {
                 .mainImage(normalizeProductImageUrl(imageUrl))
                 .secondaryImages(secondaryImageUrls == null ? new ArrayList<>() : new ArrayList<>(secondaryImageUrls))
                 .category(resolveCategory(request))
+                .requiresPdfForm(requiresPdf)
+                .templatePdfUrl(templatePdfPath)
                 .build();
 
         return mapToResponse(productRepository.save(product));
@@ -252,7 +265,7 @@ public class ProductService {
      */
     @Transactional
     public ProductResponse updateProduct(Long id, com.storeall.api.dto.ProductRequest request, String imageUrl,
-            List<String> newSecondaryImageUrls) {
+            List<String> newSecondaryImageUrls, String templatePdfPath, boolean removeTemplatePdf) {
         Long storeId = StoreContext.getStoreIdOrNull();
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Produit introuvable ID: " + id));
@@ -269,6 +282,24 @@ public class ProductService {
         product.setStock(request.getStock());
         product.setActive(request.isActive());
         product.setPurchaseAllowed(request.isPurchaseAllowed());
+
+        // PDF modèle
+        if (removeTemplatePdf) {
+            productPdfService.deleteTemplateIfExists(product.getTemplatePdfUrl());
+            product.setTemplatePdfUrl(null);
+            product.setRequiresPdfForm(false);
+        } else if (templatePdfPath != null && !templatePdfPath.isBlank()) {
+            productPdfService.deleteTemplateIfExists(product.getTemplatePdfUrl());
+            product.setTemplatePdfUrl(templatePdfPath);
+            product.setRequiresPdfForm(true);
+        } else if (request.isRequiresPdfForm()) {
+            if (product.getTemplatePdfUrl() == null || product.getTemplatePdfUrl().isBlank()) {
+                throw new RuntimeException("Un PDF modèle est obligatoire si le formulaire PDF est activé.");
+            }
+            product.setRequiresPdfForm(true);
+        } else {
+            product.setRequiresPdfForm(false);
+        }
 
         // Mettre à jour l'image seulement si une nouvelle est fournie
         if (imageUrl != null && !imageUrl.isEmpty()) {

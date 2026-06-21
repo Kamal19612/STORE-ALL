@@ -3,6 +3,9 @@ package com.storeall.api.controller;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -51,6 +54,20 @@ public class AdminOrderController {
     @GetMapping("/{id}")
     public ResponseEntity<Order> getOrderById(@PathVariable Long id) {
         return ResponseEntity.ok(orderService.getOrderById(id));
+    }
+
+    /**
+     * GET /api/manager/{storeId}/orders/{orderId}/items/{itemId}/pdf
+     */
+    @GetMapping("/{orderId}/items/{itemId}/pdf")
+    public ResponseEntity<Resource> getOrderItemPdf(
+            @PathVariable Long orderId,
+            @PathVariable Long itemId) {
+        Resource resource = orderService.getOrderItemPdfResource(orderId, itemId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"commande-item-" + itemId + ".pdf\"")
+                .body(resource);
     }
 
     /**

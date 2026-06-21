@@ -4,9 +4,14 @@ import { toast } from "react-toastify";
 import useCartStore from "../../store/cartStore";
 import ProductImageCarousel from "./ProductImageCarousel";
 import { getProductCopySections } from "../../utils/productCopy";
+import {
+  needsPdfBeforeCart,
+  requestAddProductToCart,
+  requestToggleProductInCart,
+} from "../../utils/productCartFlow";
 
 const ProductDetailModal = ({ product, onClose }) => {
-  const addItem = useCartStore((state) => state.addItem);
+  const isProductInCart = useCartStore((state) => state.isProductInCart);
   const items = useCartStore((state) => state.items);
 
   useEffect(() => {
@@ -36,16 +41,23 @@ const ProductDetailModal = ({ product, onClose }) => {
     return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " FCFA";
   };
 
-  const isInCart = items.some((item) => item.id === product.id);
+  const requiresPdf = needsPdfBeforeCart(product);
+  const isInCart = !requiresPdf && isProductInCart(product.id);
+  const pdfLinesInCart = requiresPdf
+    ? items.filter((item) => item.id === product.id && item.hasPdfCustomization).length
+    : 0;
 
   const handleAddToCart = (e) => {
     e.stopPropagation();
     if (!canPurchase) return;
-    if (isInCart) {
-      const removeItem = useCartStore.getState().removeItem;
-      removeItem(product.id);
-    } else {
-      addItem(product);
+
+    if (requiresPdf) {
+      requestAddProductToCart(product);
+      return;
+    }
+
+    const result = requestToggleProductInCart(product);
+    if (result === "added") {
       toast.success("✓ Produit ajouté ! Vérifiez votre panier");
     }
   };
@@ -188,6 +200,12 @@ const ProductDetailModal = ({ product, onClose }) => {
                     <>
                       <i className="fas fa-check mr-2" aria-hidden />
                       Produit au panier
+                    </>
+                  ) : requiresPdf ? (
+                    <>
+                      <i className="fas fa-file-alt mr-2" aria-hidden />
+                      Remplir le formulaire
+                      {pdfLinesInCart > 0 ? ` (${pdfLinesInCart} au panier)` : ""}
                     </>
                   ) : (
                     <>

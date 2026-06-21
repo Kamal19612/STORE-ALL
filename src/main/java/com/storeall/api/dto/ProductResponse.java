@@ -34,4 +34,13 @@ public class ProductResponse {
     private boolean purchaseAllowed;
     private boolean active; // Statut actif réel (pour l'édition Admin)
     private boolean created; // Utilisé pour l'import (vrai si créé, faux si mis à jour)
+
+    /** Le produit exige un formulaire PDF avant achat. */
+    private boolean requiresPdfForm;
+
+    /** Un PDF modèle est rattaché (URL non exposée au public). */
+    private boolean hasPdfTemplate;
+
+    /** Admin uniquement : nom du fichier modèle pour affichage. */
+    private String templatePdfName;
 }

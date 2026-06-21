@@ -168,6 +168,26 @@ public class Order {
     @Builder.Default
     private Status status = Status.PENDING;
 
+    /** Mode de paiement (COD ou YengaPay). */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    @Builder.Default
+    private PaymentMethod paymentMethod = PaymentMethod.COD;
+
+    /** Statut du paiement. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    @Builder.Default
+    private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
+
+    /** ID transaction YengaPay (webhook). */
+    @Column(length = 100)
+    private String yengapayTransactionId;
+
+    /** ID payment intent YengaPay. */
+    @Column(length = 100)
+    private String yengapayPaymentIntentId;
+
     /**
      * Liste des articles commandés
      */

@@ -13,6 +13,7 @@ import {
 import axios from "axios";
 import useCartStore from "../../store/cartStore";
 import api, { getPublicSettings } from "../../services/api";
+import { submitOrder } from "../../services/orderService";
 import { withShopPrefix } from "../../services/storefrontShopApiPrefix";
 import { toast } from "react-toastify";
 import { getExplicitStoreCode } from "../../services/store/storeContext";
@@ -94,6 +95,7 @@ const Checkout = () => {
   const [typeSurcharge, setTypeSurcharge] = useState(0);
   const [deliveryCost, setDeliveryCost] = useState(0);
   const [distance, setDistance] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState("COD");
   // Coordonnées du magasin résolues une seule fois (store_location peut être une URL ou "lat,lng")
   const [storeCoords, setStoreCoords] = useState(null);
   const [storeLocationResolving, setStoreLocationResolving] = useState(false);
@@ -113,6 +115,10 @@ const Checkout = () => {
   // Indicatif (piloté par l'admin). Fallback: Burkina (+226).
   const dialCode = (appSettings.customer_whatsapp_dial_code || "+226").trim() || "+226";
   const dialPrefix = dialCode.endsWith(" ") ? dialCode : dialCode + " ";
+  const yengapayEnabled =
+    appSettings.yengapay_enabled === "true" ||
+    appSettings.yengapay_enabled === "1" ||
+    appSettings.yengapay_enabled === "yes";
 
   // Initialiser / réaligner le téléphone dès que les settings sont chargés.
   // On le fait 1) au premier chargement et 2) si l'admin change l'indicatif.
@@ -513,22 +519,32 @@ const Checkout = () => {
     const payload = {
       ...formData,
       fulfillmentType: "DELIVERY",
+      paymentMethod,
       deliveryCost,
       distance,
       totalAmount: total + deliveryCost,
-      items: items.map((item) => ({
-        productId: item.id,
-        quantity: item.quantity,
-      })),
     };
 
     try {
-      const response = await api.post("/orders", payload);
+      const response = await submitOrder(payload, items);
+      if (response.data?.yengapayCheckoutUrl) {
+        try {
+          sessionStorage.setItem(
+            `pending_payment_${response.data.orderNumber}`,
+            String(storeCode || ""),
+          );
+        } catch {
+          /* ignore */
+        }
+        clearCart();
+        window.location.href = response.data.yengapayCheckoutUrl;
+        return;
+      }
       setOrderSuccess(response.data);
       toast.success("Commande enregistrée !");
     } catch (error) {
       console.error("Erreur commande:", error);
-      const errorMessage = error.response?.data?.message || "Une erreur est survenue lors de la commande.";
+      const errorMessage = error.response?.data?.message || error?.message || "Une erreur est survenue lors de la commande.";
       const validationErrors = error.response?.data?.errors;
 
       if (validationErrors && Array.isArray(validationErrors)) {
@@ -1022,6 +1038,44 @@ const Checkout = () => {
                 </div>
               </div>
 
+              {yengapayEnabled ? (
+                <div className="space-y-3 pt-2">
+                  <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">
+                    Mode de paiement
+                  </h3>
+                  <label className="flex items-start gap-3 p-4 border border-gray-200 rounded-xl cursor-pointer hover:border-primary/40 transition-colors">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="COD"
+                      checked={paymentMethod === "COD"}
+                      onChange={() => setPaymentMethod("COD")}
+                      className="mt-1"
+                    />
+                    <div>
+                      <span className="font-bold text-secondary">Payer à la livraison</span>
+                      <p className="text-sm text-gray-500">Espèces ou mobile money au livreur</p>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 p-4 border border-gray-200 rounded-xl cursor-pointer hover:border-primary/40 transition-colors">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="YENGAPAY"
+                      checked={paymentMethod === "YENGAPAY"}
+                      onChange={() => setPaymentMethod("YENGAPAY")}
+                      className="mt-1"
+                    />
+                    <div>
+                      <span className="font-bold text-secondary">Payer maintenant (YengaPay)</span>
+                      <p className="text-sm text-gray-500">
+                        Orange Money, Moov, Coris, PayPal…
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              ) : null}
+
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1 uppercase tracking-wider">
                   Notes (Optionnel)
@@ -1080,7 +1134,9 @@ const Checkout = () => {
               ) : (
                 <>
                   <Send className="h-5 w-5" />
-                  Confirmer ma commande
+                  {paymentMethod === "YENGAPAY" && yengapayEnabled
+                    ? "Payer avec YengaPay"
+                    : "Confirmer ma commande"}
                 </>
               )}
             </button>

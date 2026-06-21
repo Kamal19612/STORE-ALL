@@ -66,4 +66,16 @@ public class OrderItem {
      */
     @Column(nullable = false)
     private BigDecimal totalPrice;
+
+    /**
+     * Chemin relatif du PDF rempli par le client (stockage privé).
+     */
+    @Column(name = "filled_pdf_url", length = 2048)
+    private String filledPdfUrl;
+
+    /**
+     * Valeurs des champs du formulaire PDF (JSON).
+     */
+    @Column(name = "pdf_field_values", columnDefinition = "TEXT")
+    private String pdfFieldValues;
 }
