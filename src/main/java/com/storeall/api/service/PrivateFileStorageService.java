@@ -26,7 +26,7 @@ public class PrivateFileStorageService {
     public static final String PRODUCTS_PDF_DIR = "products-pdf";
     public static final String ORDERS_PDF_DIR = "orders";
 
-    private static final long MAX_TEMPLATE_PDF_BYTES = 5L * 1024L * 1024L; // 5 Mo
+    public static final long MAX_TEMPLATE_PDF_BYTES = 5L * 1024L * 1024L; // 5 Mo
     private static final long MAX_FILLED_PDF_BYTES = 10L * 1024L * 1024L; // 10 Mo
 
     private final Path privateStorageRoot;
@@ -50,6 +50,28 @@ public class PrivateFileStorageService {
     public String storeProductTemplatePdf(MultipartFile file) {
         validatePdfUpload(file, MAX_TEMPLATE_PDF_BYTES);
         return storeInSubdir(file, PRODUCTS_PDF_DIR);
+    }
+
+    /**
+     * Sauvegarde un PDF modèle depuis des octets (import URL Sheet/CSV).
+     */
+    public String storeProductTemplatePdfBytes(byte[] bytes) {
+        if (bytes == null || bytes.length == 0) {
+            throw new RuntimeException("Fichier PDF manquant.");
+        }
+        if (bytes.length > MAX_TEMPLATE_PDF_BYTES) {
+            throw new RuntimeException("PDF trop volumineux (max 5 Mo).");
+        }
+        String newFileName = java.util.UUID.randomUUID() + ".pdf";
+        try {
+            Path targetDir = privateStorageRoot.resolve(PRODUCTS_PDF_DIR);
+            Files.createDirectories(targetDir);
+            Path targetLocation = targetDir.resolve(newFileName);
+            Files.write(targetLocation, bytes);
+            return PRODUCTS_PDF_DIR + "/" + newFileName;
+        } catch (IOException ex) {
+            throw new RuntimeException("Impossible de stocker le PDF.", ex);
+        }
     }
 
     /**

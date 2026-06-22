@@ -104,7 +104,9 @@ public class GoogleSheetsService {
             int volumeWeight,
             int categoryName,
             int availability,
-            int price) {
+            int price,
+            int templatePdfUrl,
+            int requiresPdfForm) {
     }
 
     private static String normalizeHeaderCell(String raw) {
@@ -178,6 +180,11 @@ public class GoogleSheetsService {
         int desc = headerIndexOf(idx, "mode d emploi", "mode emploi", "description", "details", "instructions");
         // Volume / poids
         int vol = headerIndexOf(idx, "volume poids", "volume", "poids", "volume/poids", "volume poids (ex 50ml)");
+        // PDF modèle (URL)
+        int pdfUrl = headerIndexOf(idx,
+                "pdf", "pdf modele", "modele pdf", "template pdf", "pdf template", "url pdf", "pdf url", "lien pdf");
+        int reqPdf = headerIndexOf(idx,
+                "formulaire pdf", "requires pdf", "pdf obligatoire", "exiger pdf", "exiger formulaire pdf");
 
         // Si on n'a même pas la colonne nom, on considère que l'en-tête n'est pas exploitable
         if (name < 0) return null;
@@ -190,7 +197,50 @@ public class GoogleSheetsService {
                 vol >= 0 ? vol : 4,
                 category >= 0 ? category : 5,
                 avail >= 0 ? avail : 6,
-                price >= 0 ? price : 7);
+                price >= 0 ? price : 7,
+                pdfUrl,
+                reqPdf);
+    }
+
+    /**
+     * Ouvre le flux credentials Google Sheets (classpath: ou chemin fichier).
+     */
+    private java.io.InputStream openCredentialsStream() throws IOException {
+        String path = googleConfig.getCredentialsFilePath();
+        if (path == null || path.isBlank()) {
+            throw new IOException("Chemin credentials Google Sheets non configuré");
+        }
+        if (path.startsWith("classpath:")) {
+            String resourcePath = path.replace("classpath:", "");
+            java.io.InputStream credentialsStream = getClass().getClassLoader().getResourceAsStream(resourcePath);
+            if (credentialsStream == null) {
+                throw new IOException("Fichier credentials non trouvé dans le classpath: " + resourcePath);
+            }
+            log.info("Credentials chargés depuis le classpath: {}", resourcePath);
+            return credentialsStream;
+        }
+        log.info("Credentials chargés depuis le fichier: {}", path);
+        return new FileInputStream(path);
+    }
+
+    /**
+     * Email du compte de service Google (champ {@code client_email} du JSON credentials).
+     */
+    public Optional<String> getServiceAccountEmail() {
+        try {
+            if (googleConfig.getCredentialsFilePath() == null || googleConfig.getCredentialsFilePath().isBlank()) {
+                return Optional.empty();
+            }
+            try (java.io.InputStream credentialsStream = openCredentialsStream()) {
+                GoogleCredentials credentials = GoogleCredentials.fromStream(credentialsStream);
+                if (credentials instanceof com.google.auth.oauth2.ServiceAccountCredentials sac) {
+                    return Optional.of(sac.getClientEmail());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Impossible de lire l'email du compte de service Google Sheets: {}", e.getMessage());
+        }
+        return Optional.empty();
     }
 
     /**
@@ -199,30 +249,14 @@ public class GoogleSheetsService {
     private Sheets getSheetsService() throws IOException, GeneralSecurityException {
         final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
 
-        // Charger les crédentials depuis le fichier JSON (supporte classpath: et chemins fichiers)
-        java.io.InputStream credentialsStream;
-        String path = googleConfig.getCredentialsFilePath();
+        try (java.io.InputStream credentialsStream = openCredentialsStream()) {
+            GoogleCredentials credentials = GoogleCredentials.fromStream(credentialsStream)
+                    .createScoped(SCOPES);
 
-        if (path.startsWith("classpath:")) {
-            // Charger depuis le classpath (resources)
-            String resourcePath = path.replace("classpath:", "");
-            credentialsStream = getClass().getClassLoader().getResourceAsStream(resourcePath);
-            if (credentialsStream == null) {
-                throw new IOException("Fichier credentials non trouvé dans le classpath: " + resourcePath);
-            }
-            log.info("Credentials chargés depuis le classpath: {}", resourcePath);
-        } else {
-            // Charger depuis le système de fichiers
-            credentialsStream = new FileInputStream(path);
-            log.info("Credentials chargés depuis le fichier: {}", path);
+            return new Sheets.Builder(HTTP_TRANSPORT, JSON_FACTORY, new HttpCredentialsAdapter(credentials))
+                    .setApplicationName(googleConfig.getApplicationName())
+                    .build();
         }
-
-        GoogleCredentials credentials = GoogleCredentials.fromStream(credentialsStream)
-                .createScoped(SCOPES);
-
-        return new Sheets.Builder(HTTP_TRANSPORT, JSON_FACTORY, new HttpCredentialsAdapter(credentials))
-                .setApplicationName(googleConfig.getApplicationName())
-                .build();
     }
 
     private RestTemplate createSheetsImportRestTemplate() {
@@ -843,6 +877,10 @@ public class GoogleSheetsService {
         String categoryName = SafeGet(row, catIdx);
         String availabilityStr = SafeGet(row, availIdx);
         String priceStr = SafeGet(row, priceIdx);
+        String templatePdfUrl = (cols != null && cols.templatePdfUrl() >= 0)
+                ? SafeGet(row, cols.templatePdfUrl()) : "";
+        String requiresPdfStr = (cols != null && cols.requiresPdfForm() >= 0)
+                ? SafeGet(row, cols.requiresPdfForm()) : "";
 
         log.info("📝 [ROW {}] Processing: ID={}, Name={}, Category={}, Price={}, Availability={}",
             rowNum, externalId, name, categoryName, priceStr, availabilityStr);
@@ -879,6 +917,14 @@ public class GoogleSheetsService {
             request.setShortDescription(
                     description.length() > 100 ? description.substring(0, 97) + "..." : description
             );
+
+            if (!templatePdfUrl.isBlank()) {
+                request.setTemplatePdfSourceUrl(templatePdfUrl);
+            }
+            if (!requiresPdfStr.isBlank()) {
+                request.setRequiresPdfForm(parseSheetBoolean(requiresPdfStr));
+                request.setRequiresPdfFormImportSpecified(true);
+            }
 
             SheetDisponibiliteParse disp = parseSheetDisponibiliteColumn(availabilityStr);
             request.setStock(disp.stock());
@@ -925,6 +971,14 @@ public class GoogleSheetsService {
         }
         Object val = row.get(index);
         return val == null ? "" : val.toString().trim();
+    }
+
+    private static boolean parseSheetBoolean(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return false;
+        }
+        String v = raw.trim().toLowerCase(Locale.ROOT);
+        return v.equals("oui") || v.equals("yes") || v.equals("true") || v.equals("1") || v.equals("o");
     }
 
     /**

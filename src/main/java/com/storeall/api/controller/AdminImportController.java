@@ -92,6 +92,10 @@ public class AdminImportController {
                     .filter(v -> !v.isBlank())
                     .orElse(defaultSpreadsheetId != null ? defaultSpreadsheetId : "");
         }
-        return ResponseEntity.ok(java.util.Map.of("spreadsheetId", savedId));
+        java.util.Map<String, String> body = new java.util.LinkedHashMap<>();
+        body.put("spreadsheetId", savedId);
+        googleSheetsService.getServiceAccountEmail()
+                .ifPresent(email -> body.put("serviceAccountEmail", email));
+        return ResponseEntity.ok(body);
     }
 }

@@ -18,6 +18,14 @@ class PdfFieldValuesFormatterTest {
     }
 
     @Test
+    void skipsEmptyFields() {
+        String json = "{\"nom_client\":\"Kamal\",\"note\":\"\",\"opt\":false,\"ville\":\"  \"}";
+        var fields = PdfFieldValuesFormatter.parse(json);
+        assertEquals(1, fields.size());
+        assertEquals("Kamal", fields.get(0).value());
+    }
+
+    @Test
     void appendPlainTextItemDetails() {
         var fields = PdfFieldValuesFormatter.parse("{\"texte_personnalise\":\"Hello\"}");
         StringBuilder sb = new StringBuilder();

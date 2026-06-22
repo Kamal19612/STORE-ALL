@@ -74,4 +74,14 @@ public class ProductRequest {
      * En édition : supprimer le PDF modèle existant.
      */
     private boolean removeTemplatePdf = false;
+
+    /**
+     * Import Sheet/CSV : URL vers un PDF modèle AcroForm (Google Drive, lien direct…).
+     */
+    private String templatePdfSourceUrl;
+
+    /**
+     * Import Sheet/CSV : true si la colonne « formulaire pdf » / « exiger pdf » était renseignée.
+     */
+    private boolean requiresPdfFormImportSpecified = false;
 }

@@ -33,6 +33,7 @@ const ImportProductModal = ({
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState(null);
+  const [serviceAccountEmail, setServiceAccountEmail] = useState(null);
 
   const resolveManagerStoreId = () => {
     if (managerStoreId != null && managerStoreId !== "") {
@@ -52,8 +53,20 @@ const ImportProductModal = ({
     setFile(null);
     setUrl("");
     setSummary(null);
+    setServiceAccountEmail(null);
     setActiveTab(sheetsOnly ? "url" : "file");
-  }, [isOpen, sheetsOnly]);
+
+    const sid = resolveManagerStoreId();
+    if (sid == null) return;
+    adminProductService
+      .getSheetConfig(sid)
+      .then((cfg) => {
+        if (cfg?.serviceAccountEmail) {
+          setServiceAccountEmail(cfg.serviceAccountEmail);
+        }
+      })
+      .catch(() => {});
+  }, [isOpen, sheetsOnly, managerStoreId]);
 
   if (!isOpen) return null;
 
@@ -293,9 +306,23 @@ const ImportProductModal = ({
                         Assurez-vous que le lien est accessible ("Tous les
                         utilisateurs disposant du lien").
                       </p>
-                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-semibold">
-                        💡 Ajoutez l'email du compte de service Google configuré sur le backend en "Lecteur" sur votre Sheet (sinon l'API ne pourra pas lire le fichier).
-                      </p>
+                      {serviceAccountEmail ? (
+                        <div className="mt-3 rounded-lg border border-blue-200 dark:border-blue-800/50 bg-blue-50/80 dark:bg-blue-950/30 px-3 py-2">
+                          <p className="text-xs text-blue-800 dark:text-blue-200 font-medium">
+                            Compte de service Google — ajoutez-le en{" "}
+                            <strong>Lecteur</strong> sur votre Sheet :
+                          </p>
+                          <p className="mt-1 text-xs font-mono text-blue-900 dark:text-blue-100 break-all select-all">
+                            {serviceAccountEmail}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-semibold">
+                          💡 Ajoutez l&apos;email du compte de service Google configuré sur le backend en &quot;Lecteur&quot; sur votre Sheet (sinon l&apos;API ne pourra pas lire le fichier).
+                          <br />
+                          📄 Colonne optionnelle <strong>PDF</strong> ou <strong>PDF modèle</strong> : URL vers un PDF AcroForm (Google Drive en partage public, ou lien direct).
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}

@@ -12,12 +12,12 @@ function isPdfFile(file) {
 
 /**
  * Upload optionnel d'un PDF modèle AcroForm pour produits personnalisables.
+ * Dès qu'un modèle est présent, le client doit le remplir avant l'ajout au panier.
  */
 const ProductPdfTemplateField = ({
   disabled = false,
   templatePdfFile,
   existingTemplateName,
-  requiresPdfForm,
   removeTemplatePdf,
   onChange,
 }) => {
@@ -68,6 +68,7 @@ const ProductPdfTemplateField = ({
 
   const showExisting = existingTemplateName && !removeTemplatePdf && !templatePdfFile;
   const selectedName = templatePdfFile?.name;
+  const hasPdf = showExisting || Boolean(selectedName);
 
   return (
     <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-white/10">
@@ -77,8 +78,8 @@ const ProductPdfTemplateField = ({
             PDF personnalisable (optionnel)
           </label>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Le PDF doit contenir des champs de formulaire (AcroForm). Le client le remplira avant
-            d&apos;ajouter le produit au panier.
+            Le PDF doit contenir des champs de formulaire (AcroForm). S&apos;il est ajouté, le client
+            devra le remplir avant d&apos;ajouter le produit au panier.
           </p>
         </div>
         <FileText className="h-5 w-5 text-primary shrink-0 mt-0.5" aria-hidden />
@@ -90,7 +91,7 @@ const ProductPdfTemplateField = ({
             <p className="text-sm font-semibold text-gray-800 dark:text-white truncate">
               {existingTemplateName}
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Modèle actuel</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Modèle actuel — remplissage obligatoire</p>
           </div>
           <button
             type="button"
@@ -141,23 +142,11 @@ const ProductPdfTemplateField = ({
         ) : null}
       </div>
 
-      <div className="flex items-center gap-3">
-        <input
-          type="checkbox"
-          id={`${inputId}-requires`}
-          name="requiresPdfForm"
-          checked={Boolean(requiresPdfForm)}
-          disabled={disabled || (!showExisting && !templatePdfFile)}
-          onChange={(e) => onChange({ requiresPdfForm: e.target.checked })}
-          className="w-5 h-5 text-primary border-gray-300 dark:border-gray-600 rounded focus:ring-primary bg-white dark:bg-[#1c191a]"
-        />
-        <label
-          htmlFor={`${inputId}-requires`}
-          className="text-sm font-bold text-gray-700 dark:text-gray-300 select-none cursor-pointer"
-        >
-          Exiger le remplissage du PDF avant ajout au panier
-        </label>
-      </div>
+      {hasPdf ? (
+        <p className="text-xs font-semibold text-primary px-1">
+          Le formulaire PDF sera exigé automatiquement pour ce produit.
+        </p>
+      ) : null}
     </div>
   );
 };

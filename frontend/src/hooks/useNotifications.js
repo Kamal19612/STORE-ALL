@@ -4,6 +4,7 @@ import useAuthStore from "../store/authStore";
 import { sendBrowserNotification } from "./useBrowserNotifications";
 import { EventSourcePolyfill } from "event-source-polyfill";
 import { getExplicitStoreCode } from "../services/store/storeContext";
+import { isDisplayablePdfFieldValue } from "../utils/pdfFieldDisplay";
 
 // ─── Audio ────────────────────────────────────────────────────────────────────
 
@@ -13,7 +14,9 @@ function formatItemCustomizations(itemCustomizations) {
   }
   return itemCustomizations
     .map((item) => {
-      const fields = Array.isArray(item.fields) ? item.fields : [];
+      const fields = (Array.isArray(item.fields) ? item.fields : []).filter((f) =>
+        isDisplayablePdfFieldValue(f?.value),
+      );
       if (fields.length === 0) return "";
       const lines = fields.map((f) => `  • ${f.label || f.key}: ${f.value ?? ""}`);
       return `📝 ${item.productName || "Produit"}\n${lines.join("\n")}`;

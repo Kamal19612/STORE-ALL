@@ -113,7 +113,7 @@ fi
 # Telegram webhook (monorepo .env — boutons inline)
 MONO_ENV="$(cd "$STORE_DIR/.." && pwd)/.env"
 if [[ -f "$MONO_ENV" ]]; then
-  for key in TELEGRAM_WEBHOOK_URL TELEGRAM_WEBHOOK_SECRET TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID; do
+  for key in TELEGRAM_WEBHOOK_URL TELEGRAM_WEBHOOK_SECRET TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID GOOGLE_SHEETS_CREDENTIALS_PATH; do
     val="$(grep -m1 -E "^${key}=" "$MONO_ENV" 2>/dev/null | cut -d= -f2- | tr -d '\r' || true)"
     val="$(trim "$val")"
     if [[ -n "$val" && -z "${!key:-}" ]]; then

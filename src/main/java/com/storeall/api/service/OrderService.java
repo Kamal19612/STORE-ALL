@@ -208,7 +208,7 @@ public class OrderService {
                 throw new RuntimeException("Produit non disponible à la vente : " + product.getName());
             }
 
-            if (product.isRequiresPdfForm()) {
+            if (product.getTemplatePdfUrl() != null && !product.getTemplatePdfUrl().isBlank()) {
                 MultipartFile pdf = filledPdfsByIndex.get(itemIndex);
                 if (pdf == null || pdf.isEmpty()) {
                     throw new RuntimeException("PDF obligatoire pour : " + product.getName());

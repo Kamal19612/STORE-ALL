@@ -2,7 +2,7 @@ import useCartStore from "../store/cartStore";
 import usePdfFormModalStore from "../store/pdfFormModalStore";
 
 export function needsPdfBeforeCart(product) {
-  return Boolean(product?.requiresPdfForm && product?.hasPdfTemplate);
+  return Boolean(product?.hasPdfTemplate);
 }
 
 /**

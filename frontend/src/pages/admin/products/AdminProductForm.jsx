@@ -155,29 +155,18 @@ const AdminProductForm = () => {
       setTemplatePdfFile(next.templatePdfFile);
       if (next.templatePdfFile) {
         setRemoveTemplatePdf(false);
-        setFormData((prev) => ({
-          ...prev,
-          requiresPdfForm: true,
-          removeTemplatePdf: false,
-        }));
+        setFormData((prev) => ({ ...prev, removeTemplatePdf: false }));
       }
     }
     if (next.removeTemplatePdf) {
       setTemplatePdfFile(null);
       setExistingTemplateName(null);
       setRemoveTemplatePdf(true);
-      setFormData((prev) => ({
-        ...prev,
-        requiresPdfForm: false,
-        removeTemplatePdf: true,
-      }));
+      setFormData((prev) => ({ ...prev, removeTemplatePdf: true }));
       return;
     }
     if (next.removeTemplatePdf === false) {
       setRemoveTemplatePdf(false);
-    }
-    if (next.requiresPdfForm !== undefined) {
-      setFormData((prev) => ({ ...prev, requiresPdfForm: next.requiresPdfForm }));
     }
   }, []);
 
@@ -396,7 +385,6 @@ const AdminProductForm = () => {
             disabled={loading}
             templatePdfFile={templatePdfFile}
             existingTemplateName={existingTemplateName}
-            requiresPdfForm={formData.requiresPdfForm}
             removeTemplatePdf={removeTemplatePdf}
             onChange={handlePdfTemplateChange}
           />

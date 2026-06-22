@@ -36,6 +36,9 @@ public final class PdfFieldValuesFormatter {
                 if (key == null || key.isBlank()) {
                     continue;
                 }
+                if (!isDisplayableValue(entry.getValue())) {
+                    continue;
+                }
                 out.add(new FieldEntry(key, humanizeFieldName(key), formatValue(entry.getValue())));
             }
             return out;
@@ -64,7 +67,18 @@ public final class PdfFieldValuesFormatter {
         if (value instanceof Boolean b) {
             return b ? "Oui" : "Non";
         }
-        return String.valueOf(value);
+        return String.valueOf(value).trim();
+    }
+
+    /** Valeurs vides / cases non cochées : non affichées dans les détails commande. */
+    static boolean isDisplayableValue(Object value) {
+        if (value == null) {
+            return false;
+        }
+        if (value instanceof Boolean b) {
+            return b;
+        }
+        return !String.valueOf(value).trim().isEmpty();
     }
 
     public static void appendPlainTextItemDetails(StringBuilder sb, String productName, List<FieldEntry> fields) {

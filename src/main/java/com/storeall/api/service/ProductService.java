@@ -162,10 +162,19 @@ public class ProductService {
                     && product.isActive())
                 .active(product.isActive()) // Mappage statut actif réel
                 .created(false) // Par défaut false, surchargé lors de l'import
-                .requiresPdfForm(product.isRequiresPdfForm())
-                .hasPdfTemplate(product.getTemplatePdfUrl() != null && !product.getTemplatePdfUrl().isBlank())
+                .hasPdfTemplate(hasPdfTemplate(product))
+                .requiresPdfForm(hasPdfTemplate(product))
                 .templatePdfName(productPdfService.templateDisplayName(product))
                 .build();
+    }
+
+    private static boolean hasPdfTemplate(Product product) {
+        return product.getTemplatePdfUrl() != null && !product.getTemplatePdfUrl().isBlank();
+    }
+
+    /** PDF modèle présent → formulaire toujours exigé avant achat. */
+    private static void syncRequiresPdfFormWithTemplate(Product product) {
+        product.setRequiresPdfForm(hasPdfTemplate(product));
     }
 
     /**
@@ -234,10 +243,6 @@ public class ProductService {
     public ProductResponse createProduct(com.storeall.api.dto.ProductRequest request, String imageUrl,
             List<String> secondaryImageUrls, String templatePdfPath) {
         Long storeId = StoreContext.getStoreIdOrNull();
-        boolean requiresPdf = request.isRequiresPdfForm() || (templatePdfPath != null && !templatePdfPath.isBlank());
-        if (requiresPdf && (templatePdfPath == null || templatePdfPath.isBlank())) {
-            throw new RuntimeException("Un PDF modèle est obligatoire si le formulaire PDF est activé.");
-        }
 
         Product product = Product.builder()
                 .store(com.storeall.api.entity.Store.builder().id(storeId).build())
@@ -253,9 +258,9 @@ public class ProductService {
                 .mainImage(normalizeProductImageUrl(imageUrl))
                 .secondaryImages(secondaryImageUrls == null ? new ArrayList<>() : new ArrayList<>(secondaryImageUrls))
                 .category(resolveCategory(request))
-                .requiresPdfForm(requiresPdf)
                 .templatePdfUrl(templatePdfPath)
                 .build();
+        syncRequiresPdfFormWithTemplate(product);
 
         return mapToResponse(productRepository.save(product));
     }
@@ -287,19 +292,11 @@ public class ProductService {
         if (removeTemplatePdf) {
             productPdfService.deleteTemplateIfExists(product.getTemplatePdfUrl());
             product.setTemplatePdfUrl(null);
-            product.setRequiresPdfForm(false);
         } else if (templatePdfPath != null && !templatePdfPath.isBlank()) {
             productPdfService.deleteTemplateIfExists(product.getTemplatePdfUrl());
             product.setTemplatePdfUrl(templatePdfPath);
-            product.setRequiresPdfForm(true);
-        } else if (request.isRequiresPdfForm()) {
-            if (product.getTemplatePdfUrl() == null || product.getTemplatePdfUrl().isBlank()) {
-                throw new RuntimeException("Un PDF modèle est obligatoire si le formulaire PDF est activé.");
-            }
-            product.setRequiresPdfForm(true);
-        } else {
-            product.setRequiresPdfForm(false);
         }
+        syncRequiresPdfFormWithTemplate(product);
 
         // Mettre à jour l'image seulement si une nouvelle est fournie
         if (imageUrl != null && !imageUrl.isEmpty()) {
@@ -427,6 +424,24 @@ public class ProductService {
     }
 
     /**
+     * Import Sheet/CSV : télécharge le PDF modèle depuis {@link ProductRequest#getTemplatePdfSourceUrl()}.
+     */
+    private void applyImportedTemplatePdfIfRequested(Product product, ProductRequest request) {
+        String sourceUrl = request.getTemplatePdfSourceUrl();
+        if (sourceUrl == null || sourceUrl.isBlank()) {
+            return;
+        }
+        String previous = product.getTemplatePdfUrl();
+        String stored = productPdfService.storeAndValidateTemplateFromUrl(sourceUrl.trim());
+        product.setTemplatePdfUrl(stored);
+        syncRequiresPdfFormWithTemplate(product);
+        if (previous != null && !previous.isBlank() && !previous.equals(stored)) {
+            productPdfService.deleteTemplateIfExists(previous);
+        }
+        log.info("[IMPORT] PDF modèle attaché au produit {} depuis URL", product.getName());
+    }
+
+    /**
      * Importe un produit (Création ou Mise à jour basée sur l'ExternalId puis
      * Slug). Méthode transactionnelle isolée pour permettre le traitement par
      * lots "Best Effort".
@@ -477,6 +492,8 @@ public class ProductService {
                     existingProduct.setCategory(category);
                 }
 
+                applyImportedTemplatePdfIfRequested(existingProduct, request);
+                syncRequiresPdfFormWithTemplate(existingProduct);
                 Product saved = productRepository.save(existingProduct);
                 log.info("✅ [IMPORT] Produit mis à jour - ID: {}, Nom: {}, Active: {}", saved.getId(), saved.getName(), saved.isActive());
                 ProductResponse response = mapToResponse(saved);
@@ -516,6 +533,8 @@ public class ProductService {
                         existingProduct.setCategory(category);
                     }
 
+                    applyImportedTemplatePdfIfRequested(existingProduct, request);
+                    syncRequiresPdfFormWithTemplate(existingProduct);
                     Product saved = productRepository.save(existingProduct);
                     log.info("✅ [IMPORT] Produit mis à jour via Slug - ID: {}, Nom: {}, Active: {}", saved.getId(), saved.getName(), saved.isActive());
                     ProductResponse response = mapToResponse(saved);
@@ -555,6 +574,9 @@ public class ProductService {
         Category category = resolveCategory(request);
         log.debug("🏷️ [IMPORT] Catégorie résolue: {} (ID: {})", category.getName(), category.getId());
         product.setCategory(category);
+
+        applyImportedTemplatePdfIfRequested(product, request);
+        syncRequiresPdfFormWithTemplate(product);
 
         Product saved = productRepository.save(product);
         log.info("✅ [IMPORT] Nouveau produit CRÉÉ - ID: {}, Nom: {}, Active: {}, Stock: {}",
@@ -821,6 +843,8 @@ public class ProductService {
         aliasHeader(m, "stock", "qty");
         aliasHeader(m, "external_id", "externalid", "id_externe");
         aliasHeader(m, "store_code", "boutique_code", "code_boutique");
+        aliasHeader(m, "pdf", "pdf_modele", "modele_pdf", "template_pdf", "pdf_url", "url_pdf", "lien_pdf");
+        aliasHeader(m, "formulaire_pdf", "requires_pdf", "pdf_obligatoire", "exiger_pdf");
         return m;
     }
 
@@ -894,7 +918,24 @@ public class ProductService {
         request.setStock(stock);
         request.setDescription(description);
         request.setShortDescription(description.length() > 100 ? description.substring(0, 100) : description);
+        String pdfUrl = cellAt(row, col, "pdf", "pdf_modele", "modele_pdf", "template_pdf", "pdf_url", "url_pdf", "lien_pdf");
+        if (!pdfUrl.isBlank()) {
+            request.setTemplatePdfSourceUrl(pdfUrl);
+        }
+        String requirePdf = cellAt(row, col, "formulaire_pdf", "requires_pdf", "pdf_obligatoire", "exiger_pdf");
+        if (!requirePdf.isBlank()) {
+            request.setRequiresPdfForm(parseImportBoolean(requirePdf));
+            request.setRequiresPdfFormImportSpecified(true);
+        }
         importProduct(request, imageUrl, externalId);
         summary.incrementSuccess();
+    }
+
+    private static boolean parseImportBoolean(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return false;
+        }
+        String v = raw.trim().toLowerCase();
+        return v.equals("oui") || v.equals("yes") || v.equals("true") || v.equals("1") || v.equals("o");
     }
 }

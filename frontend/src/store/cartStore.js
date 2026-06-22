@@ -28,7 +28,7 @@ function normalizeCartProduct(product) {
 }
 
 function needsPdfCustomization(product) {
-  return Boolean(product?.requiresPdfForm && product?.hasPdfTemplate);
+  return Boolean(product?.hasPdfTemplate);
 }
 
 const shopCartJsonStorage = createJSONStorage(() => ({

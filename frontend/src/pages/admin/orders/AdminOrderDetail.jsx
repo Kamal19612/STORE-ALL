@@ -20,20 +20,7 @@ import adminOrderService from "../../../services/adminOrderService";
 import useAuthStore from "../../../store/authStore";
 import { useStaffBasePath } from "../../../hooks/useStaffBasePath";
 import ProductImage from "../../../components/product/ProductImage";
-
-function parsePdfFieldSummary(pdfFieldValues) {
-  if (!pdfFieldValues) return [];
-  try {
-    const parsed = typeof pdfFieldValues === "string" ? JSON.parse(pdfFieldValues) : pdfFieldValues;
-    if (!parsed || typeof parsed !== "object") return [];
-    return Object.entries(parsed).map(([key, value]) => ({
-      key,
-      value: value == null ? "" : String(value),
-    }));
-  } catch {
-    return [];
-  }
-}
+import { parsePdfFieldSummaryForDisplay } from "../../../utils/pdfFieldDisplay";
 
 const AdminOrderDetail = () => {
   const staffBase = useStaffBasePath();
@@ -291,7 +278,7 @@ const AdminOrderDetail = () => {
 
               <div className="divide-y divide-gray-100 dark:divide-white/5">
                 {order.items.map((item) => {
-                  const pdfSummary = parsePdfFieldSummary(item.pdfFieldValues);
+                  const pdfSummary = parsePdfFieldSummaryForDisplay(item.pdfFieldValues);
                   return (
                   <div
                     key={item.id}
@@ -350,10 +337,10 @@ const AdminOrderDetail = () => {
                         </div>
                         {pdfSummary.length > 0 ? (
                           <dl className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
-                            {pdfSummary.map(({ key, value }) => (
+                            {pdfSummary.map(({ key, label, value }) => (
                               <div key={key} className="flex gap-1 min-w-0">
-                                <dt className="font-semibold shrink-0">{key}:</dt>
-                                <dd className="truncate">{value || "—"}</dd>
+                                <dt className="font-semibold shrink-0">{label}:</dt>
+                                <dd className="truncate">{value}</dd>
                               </div>
                             ))}
                           </dl>
