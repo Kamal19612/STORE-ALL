@@ -14,6 +14,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import com.storeall.api.config.AppProperties;
 import com.storeall.api.tenant.StoreContextFilter;
 
 /**
@@ -38,6 +39,9 @@ public class SecurityConfig {
 
     @Autowired
     private StoreContextFilter storeContextFilter;
+
+    @Autowired
+    private AppProperties appProperties;
 
     /**
      * Configure le fournisseur d'authentification DAO (Data Access Object). Il
@@ -113,7 +117,16 @@ public class SecurityConfig {
     @Bean
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
         org.springframework.web.cors.CorsConfiguration configuration = new org.springframework.web.cors.CorsConfiguration();
-        configuration.setAllowedOriginPatterns(java.util.List.of("*")); // Autorise tout (Dev)
+        String origins = appProperties.getCors().getAllowedOriginPatterns();
+        if (origins == null || origins.isBlank()) {
+            configuration.setAllowedOriginPatterns(java.util.List.of("*"));
+        } else {
+            configuration.setAllowedOriginPatterns(
+                    java.util.Arrays.stream(origins.split(","))
+                            .map(String::trim)
+                            .filter(s -> !s.isEmpty())
+                            .toList());
+        }
         configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         // Keep headers explicit: SSE uses Last-Event-ID, and multi-store uses X-Store-Code.
         configuration.setAllowedHeaders(java.util.List.of("Authorization", "Content-Type", "X-Store-Code", "Last-Event-ID"));

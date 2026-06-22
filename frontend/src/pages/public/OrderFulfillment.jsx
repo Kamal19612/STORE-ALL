@@ -112,6 +112,7 @@ const OrderFulfillment = () => {
 
   const handlePickupSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
 
     const payload = {
@@ -135,10 +136,10 @@ const OrderFulfillment = () => {
         } catch {
           /* ignore */
         }
-        clearCart();
         window.location.href = response.data.yengapayCheckoutUrl;
         return;
       }
+      clearCart();
       setOrderSuccess(response.data);
       setStep(STEPS.SUCCESS);
       toast.success("Commande enregistrée !");

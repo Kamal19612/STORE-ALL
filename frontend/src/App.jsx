@@ -65,6 +65,7 @@ const StorefrontVitrinePage = lazyWithRetry(() => import("./components/storefron
 const Checkout = lazyWithRetry(() => import("./pages/public/Checkout"));
 const OrderFulfillment = lazyWithRetry(() => import("./pages/public/OrderFulfillment"));
 const PaymentReturn = lazyWithRetry(() => import("./pages/public/PaymentReturn"));
+const CartPage = lazyWithRetry(() => import("./pages/public/CartPage"));
 const Login = lazyWithRetry(() => import("./pages/Login"));
 
 // Admin Pages
@@ -275,14 +276,7 @@ function App() {
                     </div>
                   }
                 />
-                <Route
-                  path="cart"
-                  element={
-                    <div className="p-20 text-center dark:text-white">
-                      Page Panier en construction
-                    </div>
-                  }
-                />
+                <Route path="cart" element={<CartPage />} />
                 <Route path="commande" element={<OrderFulfillment />} />
                 <Route path="checkout" element={<Checkout />} />
                 <Route path="paiement/retour" element={<PaymentReturn />} />

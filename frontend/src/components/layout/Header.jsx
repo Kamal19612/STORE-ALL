@@ -26,34 +26,31 @@ const Header = () => {
 
   return (
     <header className="sticky top-0 z-50 bg-secondary text-white shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16 md:h-20">
-          {/* Logo - Positioned left on all screens */}
-          <div className="flex-shrink-0 flex items-center h-full py-4">
-            <Link to={shopHome} className="flex items-center gap-3 group">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-12 md:h-20">
+          <div className="flex-shrink-0 flex items-center h-full md:py-4">
+            <Link to={shopHome} className="flex items-center gap-2 md:gap-3 group">
               <img
                 src={imgSrc}
                 alt={imgAlt}
-                className="h-12 w-auto object-contain max-w-[200px]"
+                className="h-8 w-auto object-contain max-w-[120px] md:h-12 md:max-w-[200px]"
                 onError={() => setLogoFailed(true)}
               />
             </Link>
           </div>
 
-          {/* Navigation Desktop - Vide pour l'instant */}
           <nav className="hidden md:flex space-x-8"></nav>
 
-          {/* Actions */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center">
             <button
               id="cart-toggle"
               onClick={() => setIsCartOpen(true)}
-              className={`relative px-4 py-2 rounded-lg transition-transform hover:scale-105 active:scale-95 bg-primary text-secondary ${itemCount > 0 ? "animate-pulse-fast border-2 border-white shadow-lg" : ""}`}
+              className={`relative px-2.5 py-1.5 md:px-4 md:py-2 rounded-lg transition-transform hover:scale-105 active:scale-95 bg-primary text-secondary ${itemCount > 0 ? "animate-pulse-fast border-2 border-white shadow-lg" : ""}`}
             >
-              <ShoppingCart className="h-6 w-6" />
+              <ShoppingCart className="h-5 w-5 md:h-6 md:w-6" />
               <span
                 id="cart-count"
-                className={`absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-white text-xs font-bold shadow-sm ${itemCount > 0 ? "animate-bounce-scale" : ""}`}
+                className={`absolute -top-1.5 -right-1.5 md:-top-2 md:-right-2 flex h-5 w-5 md:h-6 md:w-6 items-center justify-center rounded-full bg-secondary text-white text-[10px] md:text-xs font-bold shadow-sm ${itemCount > 0 ? "animate-bounce-scale" : ""}`}
               >
                 {itemCount}
               </span>

@@ -84,6 +84,14 @@ orders:
     sync-rate: 60000
     sync-initial-delay: 45000
 
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGINS:*}
+
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    orders-max-per-minute: ${RATE_LIMIT_ORDERS_PER_MINUTE:10}
+    login-max-per-minute: ${RATE_LIMIT_LOGIN_PER_MINUTE:20}
+
 tenant:
   default-store-code: spirit
   host-label-to-store-code:

@@ -23,6 +23,8 @@ import com.storeall.api.service.OrderService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.Validator;
 
 /**
  * Contrôleur REST pour la gestion des commandes publiques.
@@ -37,6 +39,9 @@ public class OrderController {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private Validator validator;
 
     /**
      * POST /api/orders : Créer une nouvelle commande (JSON).
@@ -56,6 +61,7 @@ public class OrderController {
             @RequestPart("order") String orderJson,
             HttpServletRequest request) throws IOException {
         OrderRequest orderRequest = objectMapper.readValue(orderJson, OrderRequest.class);
+        validateOrderRequest(orderRequest);
         Map<Integer, MultipartFile> filledPdfs = extractFilledPdfs(request);
         OrderResponse response = orderService.createOrder(orderRequest, filledPdfs);
         return ResponseEntity.ok(response);
@@ -78,5 +84,17 @@ public class OrderController {
             }
         });
         return filledPdfs;
+    }
+
+    private void validateOrderRequest(OrderRequest orderRequest) {
+        BeanPropertyBindingResult errors = new BeanPropertyBindingResult(orderRequest, "orderRequest");
+        validator.validate(orderRequest, errors);
+        if (errors.hasErrors()) {
+            String msg = errors.getFieldErrors().stream()
+                    .findFirst()
+                    .map(err -> err.getField() + " " + (err.getDefaultMessage() == null ? "invalide" : err.getDefaultMessage()))
+                    .orElse("Paramètres invalides.");
+            throw new IllegalArgumentException(msg);
+        }
     }
 }

@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { CheckCircle, Clock, XCircle, Home as HomeIcon } from "lucide-react";
 import { getPaymentStatus } from "../../services/api";
 import { useStorefrontHref } from "../../hooks/useStorefrontHref";
+import { clearCartAfterPayment } from "../../utils/cartAfterPayment";
 
 const PaymentReturn = () => {
   const { storeCode } = useParams();
@@ -32,6 +33,14 @@ const PaymentReturn = () => {
         if (cancelled) return;
         setStatus(res.data);
         setLoading(false);
+
+        if (
+          res.data.paymentStatus === "PAID" ||
+          res.data.paymentStatus === "FAILED" ||
+          res.data.paymentStatus === "CANCELLED"
+        ) {
+          clearCartAfterPayment();
+        }
 
         if (res.data.paymentStatus === "PENDING" && attempts < maxAttempts) {
           attempts += 1;

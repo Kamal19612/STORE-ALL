@@ -195,7 +195,7 @@ public class OrderService {
         // 3. Traiter chaque article
         int itemIndex = 0;
         for (OrderItemRequest itemRequest : request.getItems()) {
-            Product product = productRepository.findById(itemRequest.getProductId())
+            Product product = productRepository.findByIdForUpdate(itemRequest.getProductId())
                     .orElseThrow(() -> new RuntimeException("Produit non trouvé ID: " + itemRequest.getProductId()));
             if (product.getStore() == null || product.getStore().getId() == null || !product.getStore().getId().equals(storeId)) {
                 throw new RuntimeException("Produit non trouvé ID: " + itemRequest.getProductId());
@@ -360,7 +360,11 @@ public class OrderService {
 
     private void restoreOrderStock(Order order) {
         for (OrderItem item : order.getItems()) {
-            Product product = item.getProduct();
+            Product productRef = item.getProduct();
+            if (productRef == null || productRef.getId() == null) {
+                continue;
+            }
+            Product product = productRepository.findByIdForUpdate(productRef.getId()).orElse(null);
             if (product == null) {
                 continue;
             }

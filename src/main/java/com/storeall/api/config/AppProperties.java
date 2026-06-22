@@ -34,6 +34,23 @@ public class AppProperties {
     private final Delivery delivery = new Delivery();
     /** Non-final : le binder {@code @ConfigurationProperties} doit pouvoir remplacer l’instance imbriquée si besoin. */
     private Bootstrap bootstrap = new Bootstrap();
+    private final Cors cors = new Cors();
+    private final RateLimit rateLimit = new RateLimit();
+
+    @Data
+    public static class Cors {
+        /** Liste séparée par virgules ou motif unique. Défaut dev : * */
+        private String allowedOriginPatterns = "*";
+    }
+
+    @Data
+    public static class RateLimit {
+        private boolean enabled = true;
+        /** POST /api/orders par IP et minute */
+        private int ordersMaxPerMinute = 10;
+        /** POST /api/login par IP et minute */
+        private int loginMaxPerMinute = 20;
+    }
 
     @Data
     public static class Bootstrap {
