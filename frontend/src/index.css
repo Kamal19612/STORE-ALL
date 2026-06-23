@@ -52,6 +52,7 @@
   /* Custom color palette from PHP index.php - Source of Truth */
   --primary: #f5ad41;
   --primary-dark: #d89a35;
+  --primary-rgb: 245, 173, 65;
   --secondary: #242021;
   --secondary-light: #3a3638;
   --accent-soft: #fdf2e2;

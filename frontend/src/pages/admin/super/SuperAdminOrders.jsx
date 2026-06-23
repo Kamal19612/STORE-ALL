@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
-import { Eye } from "lucide-react";
-import { listStores, listSuperOrders } from "../../../services/adminSupervisionService";
+import { Eye, Trash2 } from "lucide-react";
+import {
+  clearSuperStoreOrders,
+  deleteSuperOrder,
+  listStores,
+  listSuperOrders,
+} from "../../../services/adminSupervisionService";
 import { setActiveStoreCode } from "../../../services/store/storeContext";
 
 const statusLabels = {
@@ -21,6 +26,12 @@ export default function SuperAdminOrders() {
   const [rows, setRows] = useState([]);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [clearModalOpen, setClearModalOpen] = useState(false);
+  const [clearConfirmText, setClearConfirmText] = useState("");
+  const [clearLoading, setClearLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+
+  const selectedStore = stores.find((s) => String(s.id) === String(storeId));
 
   useEffect(() => {
     listStores()
@@ -46,6 +57,27 @@ export default function SuperAdminOrders() {
     fetchOrders();
   }, [fetchOrders]);
 
+  const handleDeleteOrder = async (order) => {
+    const label = order.orderNumber ? `#${order.orderNumber}` : `ID ${order.id}`;
+    if (
+      !window.confirm(
+        `Supprimer définitivement la commande ${label} ?\n\nCette action est irréversible (base de données, historique, PDF).`,
+      )
+    ) {
+      return;
+    }
+    setDeletingId(order.id);
+    try {
+      await deleteSuperOrder(order.id);
+      toast.success(`Commande ${label} supprimée définitivement`);
+      fetchOrders();
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Impossible de supprimer la commande");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="p-2 sm:p-4">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
@@ -54,26 +86,38 @@ export default function SuperAdminOrders() {
             Commandes
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-            Toutes les boutiques · filtre optionnel
+            Toutes les boutiques · suppression définitive en base
           </p>
         </div>
-        <div className="flex flex-col gap-1 min-w-[200px]">
-          <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Boutique</label>
-          <select
-            value={storeId}
-            onChange={(e) => {
-              setPage(0);
-              setStoreId(e.target.value);
-            }}
-            className="rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#242021] px-3 py-2 text-sm text-gray-900 dark:text-white"
-          >
-            <option value="">Toutes</option>
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} ({s.code})
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+          <div className="flex flex-col gap-1 min-w-[200px]">
+            <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Boutique</label>
+            <select
+              value={storeId}
+              onChange={(e) => {
+                setPage(0);
+                setStoreId(e.target.value);
+              }}
+              className="rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#242021] px-3 py-2 text-sm text-gray-900 dark:text-white"
+            >
+              <option value="">Toutes</option>
+              {stores.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.code})
+                </option>
+              ))}
+            </select>
+          </div>
+          {storeId ? (
+            <button
+              type="button"
+              onClick={() => setClearModalOpen(true)}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold"
+            >
+              <Trash2 className="h-4 w-4" />
+              Vider les commandes
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -88,7 +132,7 @@ export default function SuperAdminOrders() {
                 <th className="px-3 py-2 font-semibold text-gray-600 dark:text-gray-400">Date</th>
                 <th className="px-3 py-2 font-semibold text-gray-600 dark:text-gray-400">Total</th>
                 <th className="px-3 py-2 font-semibold text-gray-600 dark:text-gray-400">Statut</th>
-                <th className="px-3 py-2 font-semibold text-gray-600 dark:text-gray-400 text-right">Voir</th>
+                <th className="px-3 py-2 font-semibold text-gray-600 dark:text-gray-400 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-white/5">
@@ -121,15 +165,26 @@ export default function SuperAdminOrders() {
                     </td>
                     <td className="px-3 py-2">{statusLabels[o.status] || o.status}</td>
                     <td className="px-3 py-2 text-right">
-                      <Link
-                        to={`/admin/orders/${o.id}`}
-                        state={{ managerStoreId: o.storeId }}
-                        onClick={() => setActiveStoreCode(o.storeCode)}
-                        className="inline-flex p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"
-                        title="Détail (contexte boutique appliqué)"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Link>
+                      <div className="inline-flex items-center gap-1">
+                        <Link
+                          to={`/admin/orders/${o.id}`}
+                          state={{ managerStoreId: o.storeId }}
+                          onClick={() => setActiveStoreCode(o.storeCode)}
+                          className="inline-flex p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"
+                          title="Détail"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteOrder(o)}
+                          disabled={deletingId === o.id}
+                          className="inline-flex p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg disabled:opacity-50"
+                          title="Supprimer définitivement"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -161,6 +216,86 @@ export default function SuperAdminOrders() {
           </div>
         )}
       </div>
+
+      {clearModalOpen && storeId && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-[#242021] rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-200 dark:border-white/10">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+              Vider les commandes de la boutique
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              Boutique :{" "}
+              <strong className="text-gray-900 dark:text-white">
+                {selectedStore?.name ?? `#${storeId}`}
+              </strong>
+              {selectedStore?.code ? (
+                <span className="text-gray-500"> ({selectedStore.code})</span>
+              ) : null}
+            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              Toutes les commandes de cette boutique seront{" "}
+              <strong className="text-red-600">supprimées définitivement</strong> de la base
+              (lignes, historique, notifications, PDF).{" "}
+              <strong>Irréversible.</strong>
+            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Tapez <strong className="text-red-600 font-mono">VIDER</strong> pour confirmer :
+            </p>
+            <input
+              type="text"
+              value={clearConfirmText}
+              onChange={(e) => setClearConfirmText(e.target.value)}
+              placeholder="VIDER"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-white/20 rounded-lg mb-4 text-sm bg-white dark:bg-[#1c191a] dark:text-white focus:ring-2 focus:ring-red-500 outline-none"
+              autoFocus
+            />
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setClearModalOpen(false);
+                  setClearConfirmText("");
+                }}
+                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-white/10 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                disabled={clearConfirmText !== "VIDER" || clearLoading}
+                onClick={async () => {
+                  if (clearConfirmText !== "VIDER" || !storeId) return;
+                  setClearLoading(true);
+                  try {
+                    const res = await clearSuperStoreOrders(Number(storeId));
+                    toast.success(
+                      `${res.deletedCount ?? 0} commande(s) supprimée(s) définitivement pour cette boutique.`,
+                    );
+                    setClearModalOpen(false);
+                    setClearConfirmText("");
+                    setPage(0);
+                    fetchOrders();
+                  } catch (err) {
+                    toast.error(
+                      err.response?.data?.message ||
+                        err.response?.data?.error ||
+                        "Échec du vidage des commandes",
+                    );
+                  } finally {
+                    setClearLoading(false);
+                  }
+                }}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {clearLoading && (
+                  <span className="inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
+                Supprimer toutes les commandes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate, useSearchParams } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Suspense, lazy, useLayoutEffect } from "react";
@@ -65,6 +65,7 @@ const StorefrontVitrinePage = lazyWithRetry(() => import("./components/storefron
 const Checkout = lazyWithRetry(() => import("./pages/public/Checkout"));
 const OrderFulfillment = lazyWithRetry(() => import("./pages/public/OrderFulfillment"));
 const PaymentReturn = lazyWithRetry(() => import("./pages/public/PaymentReturn"));
+const PaymentWhatsAppBridge = lazyWithRetry(() => import("./pages/public/PaymentWhatsAppBridge"));
 const CartPage = lazyWithRetry(() => import("./pages/public/CartPage"));
 const Login = lazyWithRetry(() => import("./pages/Login"));
 
@@ -121,6 +122,33 @@ function RedirectLegacyCheckout() {
     /* ignore */
   }
   return <Navigate to={`/${code}/checkout`} replace />;
+}
+
+/** Redirection /paiement/retour → /{code}/paiement/retour (session pending_payment ou boutique active). */
+function RedirectLegacyPaymentReturn() {
+  const [searchParams] = useSearchParams();
+  const orderNumber = searchParams.get("order") || "";
+  let code = DEFAULT_SHOP_CODE;
+
+  try {
+    if (orderNumber) {
+      const pending = sessionStorage.getItem(`pending_payment_${orderNumber}`);
+      if (pending && /^[a-z0-9_-]+$/i.test(pending.trim())) {
+        code = pending.trim().toLowerCase();
+      }
+    }
+    if (code === DEFAULT_SHOP_CODE) {
+      const stored = localStorage.getItem("active_store_code");
+      if (stored && /^[a-z0-9_-]+$/i.test(stored.trim())) {
+        code = stored.trim().toLowerCase();
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  const qs = orderNumber ? `?order=${encodeURIComponent(orderNumber)}` : "";
+  return <Navigate to={`/${code}/paiement/whatsapp${qs}`} replace />;
 }
 
 function App() {
@@ -262,6 +290,7 @@ function App() {
 
             {/* Liens historiques sans préfixe boutique (évite une page vide) */}
             <Route path="/checkout" element={<RedirectLegacyCheckout />} />
+            <Route path="/paiement/retour" element={<RedirectLegacyPaymentReturn />} />
 
             {/* Vitrine publique par code boutique : /{code} (ex. /sucre, /sucre/checkout) — en dernier pour ne pas masquer /login, /admin, … */}
             <Route path="/:storeCode" element={<StorefrontShell />}>
@@ -280,6 +309,7 @@ function App() {
                 <Route path="commande" element={<OrderFulfillment />} />
                 <Route path="checkout" element={<Checkout />} />
                 <Route path="paiement/retour" element={<PaymentReturn />} />
+                <Route path="paiement/whatsapp" element={<PaymentWhatsAppBridge />} />
               </Route>
             </Route>
           </Routes>

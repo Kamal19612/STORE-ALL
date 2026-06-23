@@ -61,7 +61,7 @@ const AdminOrderList = () => {
   const handleDelete = async (id) => {
     if (
       window.confirm(
-        "Êtes-vous sûr de vouloir supprimer cette commande définitivement ?",
+        "Êtes-vous sûr de vouloir supprimer définitivement cette commande ? Cette action est irréversible.",
       )
     ) {
       try {

@@ -36,6 +36,15 @@ public class AppProperties {
     private Bootstrap bootstrap = new Bootstrap();
     private final Cors cors = new Cors();
     private final RateLimit rateLimit = new RateLimit();
+    private final Telegram telegram = new Telegram();
+
+    @Data
+    public static class Telegram {
+        private String botToken;
+        private String chatId;
+        private String webhookUrl;
+        private String webhookSecret;
+    }
 
     @Data
     public static class Cors {

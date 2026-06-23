@@ -20,6 +20,9 @@ export default function VitrineTemplatePicker({
   accentColor = "",
   primaryColor = "",
   heroCyan = "",
+  classicThemeId = "",
+  classicPrimaryColor = "",
+  classicSecondaryColor = "",
   showComingSoon = false,
   /** @type {'side' | 'stacked'} */
   layout = "side",
@@ -39,6 +42,9 @@ export default function VitrineTemplatePicker({
     accentColor,
     primaryColor,
     heroCyan,
+    classicThemeId,
+    classicPrimaryColor,
+    classicSecondaryColor,
   };
 
   const selectorBlock = (

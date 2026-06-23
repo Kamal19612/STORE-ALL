@@ -1,0 +1,145 @@
+/* Modèle vitrine classique — parcours checkout / panier / paiement */
+
+html.vitrine-classic-active .checkout-page,
+.vitrine-classic .checkout-page {
+  --checkout-heading: var(--secondary);
+}
+
+html.vitrine-classic-active .checkout-page h1,
+html.vitrine-classic-active .checkout-page h2,
+.vitrine-classic .checkout-page h1,
+.vitrine-classic .checkout-page h2 {
+  color: var(--secondary);
+}
+
+html.vitrine-classic-active .checkout-page .checkout-vitrine-title,
+.vitrine-classic .checkout-page .checkout-vitrine-title {
+  color: var(--secondary);
+  font-weight: 800;
+}
+
+html.vitrine-classic-active .checkout-page .checkout-panel,
+.vitrine-classic .checkout-page .checkout-panel {
+  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--secondary) 12%, transparent);
+  border-radius: 1rem;
+  box-shadow: 0 10px 25px color-mix(in srgb, var(--secondary) 8%, transparent);
+}
+
+html.vitrine-classic-active .checkout-page .checkout-step-badge,
+.vitrine-classic .checkout-page .checkout-step-badge {
+  background: var(--primary);
+  color: var(--secondary);
+  font-weight: 700;
+}
+
+html.vitrine-classic-active .checkout-page input:focus,
+html.vitrine-classic-active .checkout-page textarea:focus,
+html.vitrine-classic-active .checkout-page select:focus,
+.vitrine-classic .checkout-page input:focus,
+.vitrine-classic .checkout-page textarea:focus,
+.vitrine-classic .checkout-page select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent);
+  outline: none;
+}
+
+html.vitrine-classic-active .checkout-page .btn-primary,
+html.vitrine-classic-active .checkout-page button[type="submit"]:not(:disabled),
+.vitrine-classic .checkout-page .btn-primary,
+.vitrine-classic .checkout-page button[type="submit"]:not(:disabled) {
+  background: var(--primary) !important;
+  color: var(--secondary) !important;
+  font-weight: 700;
+}
+
+html.vitrine-classic-active .checkout-page .btn-primary:hover:not(:disabled),
+html.vitrine-classic-active .checkout-page button[type="submit"]:not(:disabled):hover,
+.vitrine-classic .checkout-page .btn-primary:hover:not(:disabled),
+.vitrine-classic .checkout-page button[type="submit"]:not(:disabled):hover {
+  background: var(--primary-dark) !important;
+}
+
+html.vitrine-classic-active .checkout-page .text-primary,
+.vitrine-classic .checkout-page .text-primary {
+  color: var(--primary) !important;
+}
+
+html.vitrine-classic-active .checkout-page .text-secondary,
+.vitrine-classic .checkout-page .text-secondary {
+  color: var(--secondary) !important;
+}
+
+html.vitrine-classic-active .checkout-page .border-primary,
+html.vitrine-classic-active .checkout-page .ring-primary,
+.vitrine-classic .checkout-page .border-primary,
+.vitrine-classic .checkout-page .ring-primary {
+  border-color: var(--primary) !important;
+  --tw-ring-color: var(--primary);
+}
+
+html.vitrine-classic-active .checkout-page .bg-primary\/5,
+html.vitrine-classic-active .checkout-page .bg-primary\/10,
+.vitrine-classic .checkout-page .bg-primary\/5,
+.vitrine-classic .checkout-page .bg-primary\/10 {
+  background: color-mix(in srgb, var(--primary) 12%, white) !important;
+}
+
+html.vitrine-classic-active .checkout-page .delivery-type-active,
+.vitrine-classic .checkout-page .delivery-type-active {
+  border-color: var(--primary) !important;
+  background: color-mix(in srgb, var(--primary) 10%, white) !important;
+}
+
+html.vitrine-classic-active .checkout-page .checkout-success-panel,
+.vitrine-classic .checkout-page .checkout-success-panel {
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--primary) 8%, white) 0%,
+    #fff 100%
+  );
+}
+
+html.vitrine-classic-active .cart-drawer-cta.btn-primary,
+.vitrine-classic .cart-drawer-cta.btn-primary {
+  background: var(--primary) !important;
+  color: var(--secondary) !important;
+}
+
+html.vitrine-classic-active .product-detail-modal .text-primary,
+.vitrine-classic .product-detail-modal .text-primary {
+  color: var(--primary) !important;
+}
+
+/* Panier (page + drawer) */
+html.vitrine-classic-active .cart-page .btn-primary,
+html.vitrine-classic-active .cart-drawer-cta.btn-primary,
+.vitrine-classic .cart-page .btn-primary,
+.vitrine-classic .cart-drawer-cta.btn-primary {
+  background: var(--primary) !important;
+  color: var(--secondary) !important;
+}
+
+html.vitrine-classic-active .cart-drawer-header,
+.vitrine-classic .cart-drawer-header {
+  background: var(--secondary) !important;
+}
+
+html.vitrine-classic-active .cart-drawer-header-icon,
+html.vitrine-classic-active .cart-drawer-item-price,
+.vitrine-classic .cart-drawer-header-icon,
+.vitrine-classic .cart-drawer-item-price {
+  color: var(--primary) !important;
+}
+
+html.vitrine-classic-active .product-detail-modal .btn-primary,
+.vitrine-classic .product-detail-modal .btn-primary {
+  background: var(--primary) !important;
+  color: var(--secondary) !important;
+}
+
+html.vitrine-classic-active .product-detail-modal .btn-primary:hover,
+.vitrine-classic .product-detail-modal .btn-primary:hover {
+  background: var(--primary-dark) !important;
+}

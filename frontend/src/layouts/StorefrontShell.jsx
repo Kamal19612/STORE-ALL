@@ -1,9 +1,12 @@
 import { useEffect, useLayoutEffect } from "react";
-import { Outlet, useParams } from "react-router-dom";
+import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import useCartStore from "../store/cartStore";
 import usePdfFormModalStore from "../store/pdfFormModalStore";
 import { setActiveStoreCode } from "../services/store/storeContext";
+import {
+  readYengapayCheckoutPending,
+} from "../utils/pendingYengapayReturn";
 import ProductPdfFormModal from "../components/product/ProductPdfFormModal";
 import ProductPdfFormErrorBoundary from "../components/product/ProductPdfFormErrorBoundary";
 
@@ -12,6 +15,36 @@ import ProductPdfFormErrorBoundary from "../components/product/ProductPdfFormErr
  */
 export default function StorefrontShell() {
   const { storeCode } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // YengaPay renvoie parfois vers l'accueil boutique au lieu de /paiement/whatsapp.
+  useEffect(() => {
+    if (!storeCode) return;
+    const code = String(storeCode).trim().toLowerCase();
+    const path = location.pathname.replace(/\/$/, "") || "/";
+    if (path.includes("/paiement/")) return;
+
+    const params = new URLSearchParams(location.search);
+    const yengaId = params.get("yengapay_payment_id");
+    const order = params.get("order");
+    if (yengaId || order) {
+      const qs = params.toString();
+      navigate(`/${code}/paiement/whatsapp${qs ? `?${qs}` : ""}`, { replace: true });
+      return;
+    }
+
+    const isStoreHome = path === `/${code}`;
+    if (!isStoreHome) return;
+
+    const pending = readYengapayCheckoutPending(code);
+    if (!pending) return;
+
+    navigate(
+      `/${code}/paiement/whatsapp?order=${encodeURIComponent(pending.orderNumber)}`,
+      { replace: true },
+    );
+  }, [location.pathname, location.search, storeCode, navigate]);
 
   // Avant les effets enfants (requêtes API) : même code que l’URL pour active_store_code / X-Store-Code.
   useLayoutEffect(() => {

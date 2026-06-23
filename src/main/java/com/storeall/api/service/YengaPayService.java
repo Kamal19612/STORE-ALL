@@ -24,6 +24,7 @@ import com.storeall.api.dto.YengaPayIntentResponse;
 import com.storeall.api.entity.Order;
 import com.storeall.api.entity.OrderItem;
 import com.storeall.api.tenant.StoreContext;
+import com.storeall.api.util.PublicSiteUrlResolver;
 
 import lombok.RequiredArgsConstructor;
 
@@ -35,6 +36,7 @@ public class YengaPayService {
   private static final String API_BASE = "https://api.yengapay.com/api/v1/groups";
 
   private final AppSettingService appSettingService;
+  private final PublicSiteUrlResolver publicSiteUrlResolver;
   private final ObjectMapper objectMapper;
   private final RestTemplate restTemplate = new RestTemplate();
 
@@ -76,6 +78,26 @@ public class YengaPayService {
     body.put("apiEnv", apiEnv);
     body.put("customerNumber", normalizePhone(order.getCustomerPhone()));
     body.put("articles", buildArticles(order));
+
+    String storeCode = order.getStore() != null ? order.getStore().getCode() : null;
+    // Page pont SPA : ouvre WhatsApp (nouvel onglet) + vide le panier — évite une 302 API
+    // si nginx ne relaie pas /api vers Spring.
+    String returnUrl = publicSiteUrlResolver.buildStorePaymentWhatsAppBridgeUrl(
+        storeCode, order.getOrderNumber());
+    if (returnUrl == null || returnUrl.isBlank()) {
+      returnUrl = publicSiteUrlResolver.buildYengapayApiReturnUrl();
+    }
+    if (returnUrl == null || returnUrl.isBlank()) {
+      returnUrl = publicSiteUrlResolver.buildStorePaymentReturnUrl(storeCode, order.getOrderNumber());
+    }
+    if (returnUrl != null && !returnUrl.isBlank()) {
+      body.put("redirectionUrl", returnUrl);
+      log.info("YengaPay redirectionUrl pour {} : {}", order.getOrderNumber(), returnUrl);
+    } else {
+      log.warn(
+          "YengaPay redirectionUrl absent pour {} — définir APP_PUBLIC_URL ou public_base_url",
+          order.getOrderNumber());
+    }
 
     String url = API_BASE + "/" + groupId + "/payment-intent/" + projectId;
 

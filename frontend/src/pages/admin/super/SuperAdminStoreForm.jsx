@@ -16,11 +16,14 @@ import VitrineTemplatePicker from "../../../components/admin/VitrineTemplatePick
 import VitrineTemplatePreviewPanel from "../../../components/admin/VitrineTemplatePreviewPanel";
 import VitrineAlibabaConfigFields from "../../../components/admin/VitrineAlibabaConfigFields";
 import VitrineBrandsamaConfigFields from "../../../components/admin/VitrineBrandsamaConfigFields";
+import VitrineClassicConfigFields from "../../../components/admin/VitrineClassicConfigFields";
 import { getVitrineTemplateOption, VITRINE_TEMPLATE_DEFAULT } from "../../../config/vitrineTemplates";
+import { getClassicTheme, CLASSIC_THEME_DEFAULT } from "../../../config/classicThemes";
 import {
   buildVitrineConfigForApi,
   readAlibabaFieldsFromStore,
   readBrandsamaFieldsFromStore,
+  readClassicFieldsFromStore,
 } from "../../../utils/vitrineConfigPayload";
 
 const glassBtn =
@@ -54,6 +57,11 @@ export default function SuperAdminStoreForm() {
   const [accentColor, setAccentColor] = useState("");
   const [primaryColor, setPrimaryColor] = useState("");
   const [heroCyan, setHeroCyan] = useState("");
+  const [classicThemeId, setClassicThemeId] = useState(CLASSIC_THEME_DEFAULT);
+  const [classicPrimaryColor, setClassicPrimaryColor] = useState(getClassicTheme(CLASSIC_THEME_DEFAULT).primaryColor);
+  const [classicSecondaryColor, setClassicSecondaryColor] = useState(
+    getClassicTheme(CLASSIC_THEME_DEFAULT).secondaryColor,
+  );
   const [submitting, setSubmitting] = useState(false);
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
@@ -72,6 +80,13 @@ export default function SuperAdminStoreForm() {
   const [editAccentColor, setEditAccentColor] = useState("");
   const [editPrimaryColor, setEditPrimaryColor] = useState("");
   const [editHeroCyan, setEditHeroCyan] = useState("");
+  const [editClassicThemeId, setEditClassicThemeId] = useState(CLASSIC_THEME_DEFAULT);
+  const [editClassicPrimaryColor, setEditClassicPrimaryColor] = useState(
+    getClassicTheme(CLASSIC_THEME_DEFAULT).primaryColor,
+  );
+  const [editClassicSecondaryColor, setEditClassicSecondaryColor] = useState(
+    getClassicTheme(CLASSIC_THEME_DEFAULT).secondaryColor,
+  );
   const [editLogoFile, setEditLogoFile] = useState(null);
   const [editLogoPreview, setEditLogoPreview] = useState(null);
   const [removeEditLogo, setRemoveEditLogo] = useState(false);
@@ -169,11 +184,24 @@ export default function SuperAdminStoreForm() {
     setEditVitrineTemplate(s.vitrineTemplate || VITRINE_TEMPLATE_DEFAULT);
     const ali = readAlibabaFieldsFromStore(s);
     const bs = readBrandsamaFieldsFromStore(s);
+    const classic = readClassicFieldsFromStore(s);
     setEditHeroTitle(ali.heroTitle || bs.heroTitle);
     setEditHeroSubtitle(ali.heroSubtitle || bs.heroSubtitle);
     setEditAccentColor(ali.accentColor);
     setEditPrimaryColor(bs.primaryColor);
     setEditHeroCyan(bs.heroCyan);
+    setEditClassicThemeId(classic.themeId);
+    setEditClassicPrimaryColor(classic.primaryColor);
+    setEditClassicSecondaryColor(classic.secondaryColor);
+  };
+
+  const applyClassicThemePreset = (themeId, setThemeId, setPrimary, setSecondary) => {
+    const preset = getClassicTheme(themeId);
+    setThemeId(themeId);
+    if (themeId !== "custom") {
+      setPrimary(preset.primaryColor);
+      setSecondary(preset.secondaryColor);
+    }
   };
 
   const closeEditModal = () => {
@@ -223,8 +251,10 @@ export default function SuperAdminStoreForm() {
           heroTitle: editHeroTitle,
           heroSubtitle: editHeroSubtitle,
           accentColor: editAccentColor,
-          primaryColor: editPrimaryColor,
+          primaryColor: editVitrineTemplate === "default" ? editClassicPrimaryColor : editPrimaryColor,
           heroCyan: editHeroCyan,
+          themeId: editClassicThemeId,
+          secondaryColor: editClassicSecondaryColor,
         }),
       };
       if (removeEditLogo && !editLogoFile) {
@@ -343,8 +373,10 @@ export default function SuperAdminStoreForm() {
             heroTitle,
             heroSubtitle,
             accentColor,
-            primaryColor,
+            primaryColor: vitrineTemplate === "default" ? classicPrimaryColor : primaryColor,
             heroCyan,
+            themeId: classicThemeId,
+            secondaryColor: classicSecondaryColor,
           }),
         },
         logoFile || undefined,
@@ -361,6 +393,9 @@ export default function SuperAdminStoreForm() {
       setHeroTitle("");
       setHeroSubtitle("");
       setAccentColor("");
+      setClassicThemeId(CLASSIC_THEME_DEFAULT);
+      setClassicPrimaryColor(getClassicTheme(CLASSIC_THEME_DEFAULT).primaryColor);
+      setClassicSecondaryColor(getClassicTheme(CLASSIC_THEME_DEFAULT).secondaryColor);
       clearLogo();
       setCreateOpen(false);
       await loadStores();
@@ -532,6 +567,18 @@ export default function SuperAdminStoreForm() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Domaine</label>
                 <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="optionnel" className={inputClass} />
               </div>
+              {vitrineTemplate === "default" && (
+                <VitrineClassicConfigFields
+                  themeId={classicThemeId}
+                  primaryColor={classicPrimaryColor}
+                  secondaryColor={classicSecondaryColor}
+                  onThemeIdChange={(id) =>
+                    applyClassicThemePreset(id, setClassicThemeId, setClassicPrimaryColor, setClassicSecondaryColor)
+                  }
+                  onPrimaryColorChange={setClassicPrimaryColor}
+                  onSecondaryColorChange={setClassicSecondaryColor}
+                />
+              )}
               {vitrineTemplate === "alibaba" && (
                 <VitrineAlibabaConfigFields
                   heroTitle={heroTitle}
@@ -600,6 +647,9 @@ export default function SuperAdminStoreForm() {
                 accentColor={accentColor}
                 primaryColor={primaryColor}
                 heroCyan={heroCyan}
+                classicThemeId={classicThemeId}
+                classicPrimaryColor={classicPrimaryColor}
+                classicSecondaryColor={classicSecondaryColor}
                 layout="side"
               />
             </div>
@@ -811,6 +861,23 @@ export default function SuperAdminStoreForm() {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Domaine</label>
                       <input value={editDomain} onChange={(e) => setEditDomain(e.target.value)} className={inputClass} />
                     </div>
+                    {editVitrineTemplate === "default" && (
+                      <VitrineClassicConfigFields
+                        themeId={editClassicThemeId}
+                        primaryColor={editClassicPrimaryColor}
+                        secondaryColor={editClassicSecondaryColor}
+                        onThemeIdChange={(id) =>
+                          applyClassicThemePreset(
+                            id,
+                            setEditClassicThemeId,
+                            setEditClassicPrimaryColor,
+                            setEditClassicSecondaryColor,
+                          )
+                        }
+                        onPrimaryColorChange={setEditClassicPrimaryColor}
+                        onSecondaryColorChange={setEditClassicSecondaryColor}
+                      />
+                    )}
                     {editVitrineTemplate === "alibaba" && (
                       <VitrineAlibabaConfigFields
                         heroTitle={editHeroTitle}
@@ -846,6 +913,9 @@ export default function SuperAdminStoreForm() {
                         accentColor={editAccentColor}
                         primaryColor={editPrimaryColor}
                         heroCyan={editHeroCyan}
+                        classicThemeId={editClassicThemeId}
+                        classicPrimaryColor={editClassicPrimaryColor}
+                        classicSecondaryColor={editClassicSecondaryColor}
                       />
                     </div>
                     <div className="sm:col-span-2">
@@ -931,6 +1001,9 @@ export default function SuperAdminStoreForm() {
                         accentColor={editAccentColor}
                         primaryColor={editPrimaryColor}
                         heroCyan={editHeroCyan}
+                        classicThemeId={editClassicThemeId}
+                        classicPrimaryColor={editClassicPrimaryColor}
+                        classicSecondaryColor={editClassicSecondaryColor}
                         className="border-0 bg-transparent"
                       />
                     </div>

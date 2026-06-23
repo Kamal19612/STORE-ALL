@@ -10,6 +10,15 @@ import {
   listStores,
 } from "../../../services/adminSupervisionService";
 import { getAdminSettings, updateSettings } from "../../../services/api";
+import {
+  clearSettingsDraft,
+  loadSettingsDraft,
+  mergeSettingsWithDraft,
+  saveSettingsDraft,
+} from "../../../utils/settingsDraftStorage";
+
+const TELEGRAM_DRAFT_KEY = "super_platform_telegram";
+const YENGAPAY_DRAFT_PREFIX = "super_yengapay_store_";
 
 const inputCls =
   "w-full p-2 border border-gray-300 dark:border-white/10 rounded bg-white dark:bg-[#1c191a] text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-colors";
@@ -41,6 +50,7 @@ export default function SuperAdminSettings() {
   const [saving, setSaving] = useState(false);
   const [telegramBotToken, setTelegramBotToken] = useState("");
   const [telegramChatId, setTelegramChatId] = useState("");
+  const [telegramBotTokenConfigured, setTelegramBotTokenConfigured] = useState(false);
   const [appSummary, setAppSummary] = useState(null);
   const [telegramActionLoading, setTelegramActionLoading] = useState(false);
   const [telegramTestText, setTelegramTestText] = useState("Test Telegram (super admin)");
@@ -64,6 +74,10 @@ export default function SuperAdminSettings() {
         settingsMap[s.key] = s.value;
       });
       setYengaPaySettings(pickYengaPaySettings(settingsMap));
+      const draft = loadSettingsDraft(`${YENGAPAY_DRAFT_PREFIX}${storeId}`);
+      if (draft) {
+        setYengaPaySettings((prev) => mergeSettingsWithDraft(prev, draft));
+      }
     } catch (e) {
       toast.error("Impossible de charger les paramètres YengaPay de la boutique.");
       setYengaPaySettings({});
@@ -80,8 +94,15 @@ export default function SuperAdminSettings() {
         getSuperApplicationSummary(),
         listStores(),
       ]);
-      setTelegramBotToken(tg.telegram_bot_token ?? "");
-      setTelegramChatId(tg.telegram_chat_id ?? "");
+      const tgDraft = loadSettingsDraft(TELEGRAM_DRAFT_KEY);
+      const mergedTg = mergeSettingsWithDraft(tg, tgDraft);
+      setTelegramBotToken(mergedTg.telegram_bot_token ?? "");
+      setTelegramChatId(mergedTg.telegram_chat_id ?? "");
+      setTelegramBotTokenConfigured(
+        mergedTg.telegram_bot_token_configured === "true" ||
+          mergedTg.telegram_bot_token_configured === true ||
+          Boolean(mergedTg.telegram_bot_token?.trim()),
+      );
       setAppSummary(summary);
       const list = Array.isArray(storeList) ? storeList : [];
       setStores(list);
@@ -111,6 +132,7 @@ export default function SuperAdminSettings() {
         telegram_bot_token: telegramBotToken,
         telegram_chat_id: telegramChatId,
       });
+      clearSettingsDraft(TELEGRAM_DRAFT_KEY);
       toast.success("Paramètres Telegram plateforme enregistrés. Webhook ré-enregistré côté serveur.");
       await load();
     } catch (err) {
@@ -122,7 +144,20 @@ export default function SuperAdminSettings() {
 
   const handleYengaPayChange = (e) => {
     const { name, value } = e.target;
-    setYengaPaySettings((prev) => ({ ...prev, [name]: value }));
+    setYengaPaySettings((prev) => {
+      const next = { ...prev, [name]: value };
+      if (selectedStoreId) {
+        saveSettingsDraft(`${YENGAPAY_DRAFT_PREFIX}${selectedStoreId}`, next);
+      }
+      return next;
+    });
+  };
+
+  const persistTelegramDraft = (patch) => {
+    saveSettingsDraft(TELEGRAM_DRAFT_KEY, {
+      telegram_bot_token: patch.telegramBotToken ?? telegramBotToken,
+      telegram_chat_id: patch.telegramChatId ?? telegramChatId,
+    });
   };
 
   const handleSaveYengaPay = async (e) => {
@@ -142,6 +177,7 @@ export default function SuperAdminSettings() {
             : "false",
       };
       await updateSettings(payload, selectedStoreId);
+      clearSettingsDraft(`${YENGAPAY_DRAFT_PREFIX}${selectedStoreId}`);
       toast.success("Paramètres YengaPay enregistrés pour la boutique.");
       await loadYengaPayForStore(selectedStoreId);
     } catch (err) {
@@ -279,6 +315,11 @@ export default function SuperAdminSettings() {
                     name="yengapay_api_key"
                     value={yengaPaySettings.yengapay_api_key || ""}
                     onChange={handleYengaPayChange}
+                    placeholder={
+                      yengaPaySettings.yengapay_api_key
+                        ? undefined
+                        : "•••••••• (laissez vide pour conserver la clé enregistrée)"
+                    }
                     className={`${inputCls} font-mono`}
                     autoComplete="off"
                   />
@@ -290,6 +331,7 @@ export default function SuperAdminSettings() {
                     name="yengapay_webhook_secret"
                     value={yengaPaySettings.yengapay_webhook_secret || ""}
                     onChange={handleYengaPayChange}
+                    placeholder="Laissez vide pour conserver le secret enregistré"
                     className={`${inputCls} font-mono`}
                     autoComplete="off"
                   />
@@ -318,6 +360,23 @@ export default function SuperAdminSettings() {
                     }
                     className={`${inputCls} font-mono text-sm bg-gray-50 dark:bg-black/20`}
                   />
+                </div>
+                <div className="md:col-span-2">
+                  <label className={labelCls}>URL de redirection après paiement (dashboard YengaPay)</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={
+                      typeof window !== "undefined"
+                        ? `${window.location.origin}/api/public/payments/yengapay/return`
+                        : "/api/public/payments/yengapay/return"
+                    }
+                    className={`${inputCls} font-mono text-sm bg-gray-50 dark:bg-black/20`}
+                  />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Collez cette URL dans la console YengaPay (Redirection). Après paiement : WhatsApp
+                    dans un nouvel onglet, retour automatique à la vitrine publique.
+                  </p>
                 </div>
               </div>
 
@@ -380,13 +439,25 @@ export default function SuperAdminSettings() {
               <input
                 type="password"
                 value={telegramBotToken}
-                onChange={(e) => setTelegramBotToken(e.target.value)}
-                placeholder="123456789:AAE…"
+                onChange={(e) => {
+                  setTelegramBotToken(e.target.value);
+                  persistTelegramDraft({ telegramBotToken: e.target.value });
+                }}
+                placeholder={
+                  telegramBotTokenConfigured && !telegramBotToken
+                    ? "•••••••• (déjà enregistré — laissez vide pour conserver)"
+                    : "123456789:AAE…"
+                }
                 autoComplete="off"
                 className={`${inputCls} font-mono border-blue-300 dark:border-blue-700`}
               />
               <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
                 Bot commun à toutes les boutiques (clé <code className="text-[10px]">telegram_bot_token</code>). Surcharge optionnelle par boutique dans les paramètres manager.
+                {telegramBotTokenConfigured ? (
+                  <span className="block mt-1 font-semibold text-emerald-700 dark:text-emerald-300">
+                    Token déjà enregistré en base — persistant après redémarrage.
+                  </span>
+                ) : null}
               </p>
             </div>
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30 p-3 rounded-lg">
@@ -394,7 +465,10 @@ export default function SuperAdminSettings() {
               <input
                 type="text"
                 value={telegramChatId}
-                onChange={(e) => setTelegramChatId(e.target.value)}
+                onChange={(e) => {
+                  setTelegramChatId(e.target.value);
+                  persistTelegramDraft({ telegramChatId: e.target.value });
+                }}
                 placeholder="Ex. 5654423490"
                 className={`${inputCls} font-mono border-blue-300 dark:border-blue-700`}
               />

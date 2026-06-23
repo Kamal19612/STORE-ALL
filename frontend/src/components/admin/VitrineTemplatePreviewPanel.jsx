@@ -20,6 +20,9 @@ export default function VitrineTemplatePreviewPanel({
   accentColor = "",
   primaryColor = "",
   heroCyan = "",
+  classicThemeId = "",
+  classicPrimaryColor = "",
+  classicSecondaryColor = "",
   className = "",
 }) {
   const current = templateId || VITRINE_TEMPLATE_DEFAULT;
@@ -55,7 +58,14 @@ export default function VitrineTemplatePreviewPanel({
         );
       }
       if (id === "default") {
-        return <DefaultVitrineMockup storeName={displayName} logoUrl={logoUrl} />;
+        return (
+          <DefaultVitrineMockup
+            storeName={displayName}
+            logoUrl={logoUrl}
+            primaryColor={classicPrimaryColor || primaryColor}
+            secondaryColor={classicSecondaryColor}
+          />
+        );
       }
       return <UnavailableVitrineMockup label={getVitrineTemplateOption(id).label} />;
     })();

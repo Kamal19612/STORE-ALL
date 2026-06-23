@@ -57,6 +57,7 @@ public class AdminSupervisionService {
     private final AppSettingService appSettingService;
     private final TelegramService telegramService;
     private final TenantProperties tenantProperties;
+    private final OrderService orderService;
 
     @Transactional(readOnly = true)
     public List<StoreInfoResponse> listStores() {
@@ -93,6 +94,22 @@ public class AdminSupervisionService {
     @Transactional(readOnly = true)
     public Page<SupervisionOrderRow> listOrders(Long storeId, Pageable pageable) {
         return orderRepository.findSupervisionPage(storeId, pageable).map(this::toOrderRow);
+    }
+
+    /**
+     * Suppression définitive d'une commande en base.
+     */
+    @Transactional
+    public void deleteOrderForSupervision(Long orderId) {
+        orderService.permanentlyDeleteOrder(orderId);
+    }
+
+    /**
+     * Suppression définitive de toutes les commandes d'une boutique. {@code storeId} obligatoire.
+     */
+    @Transactional
+    public int clearOrdersForStore(Long storeId) {
+        return orderService.permanentlyDeleteAllOrdersForStore(storeId);
     }
 
     @Transactional(readOnly = true)

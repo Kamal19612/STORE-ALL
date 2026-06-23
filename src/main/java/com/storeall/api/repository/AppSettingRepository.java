@@ -29,6 +29,8 @@ public interface AppSettingRepository extends JpaRepository<AppSetting, Long> {
 
     Optional<AppSetting> findFirstByKeyAndStoreIsNullOrderByIdAsc(String key);
 
+    java.util.List<AppSetting> findAllByKeyAndStoreIsNullOrderByIdAsc(String key);
+
     /**
      * Backward compatibility: legacy global setting (store_id is NULL).
      */

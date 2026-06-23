@@ -130,8 +130,7 @@ public class AdminOrderController {
     }
 
     /**
-     * DELETE /api/admin/orders/{id} : Supprimer une commande. Réservé au
-     * SUPER_ADMIN.
+     * DELETE /api/admin/orders/{id} : Suppression définitive. Réservé au SUPER_ADMIN.
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")

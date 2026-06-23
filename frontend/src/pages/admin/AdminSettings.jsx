@@ -10,6 +10,12 @@ import {
 } from "../../services/api";
 import { Save, Settings, CheckCircle, RefreshCw } from "lucide-react";
 import useAuthStore from "../../store/authStore";
+import {
+  clearSettingsDraft,
+  loadSettingsDraft,
+  mergeSettingsWithDraft,
+  saveSettingsDraft,
+} from "../../utils/settingsDraftStorage";
 
 const inputCls =
   "w-full p-2 border border-gray-300 dark:border-white/10 rounded bg-white dark:bg-[#1c191a] text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-colors";
@@ -61,7 +67,12 @@ const AdminSettings = () => {
       response.data.forEach((s) => {
         settingsMap[s.key] = s.value;
       });
-      setSettings(settingsMap);
+      const draft = loadSettingsDraft(`manager_settings_${scopeStoreId}`);
+      const merged = mergeSettingsWithDraft(settingsMap, draft);
+      if (merged.telegram_bot_token) {
+        merged.telegram_bot_token_configured = "true";
+      }
+      setSettings(merged);
     } catch (error) {
       console.error("Erreur chargement paramètres:", error);
       toast.error("Impossible de charger les paramètres.");
@@ -89,10 +100,18 @@ const AdminSettings = () => {
     // Extraction automatique de l'ID depuis une URL Google Sheets complète
     if (name === "google_sheet_id") {
       const match = value.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-      setSettings((prev) => ({ ...prev, [name]: match ? match[1] : value }));
+      setSettings((prev) => {
+        const next = { ...prev, [name]: match ? match[1] : value };
+        if (scopeStoreId != null) saveSettingsDraft(`manager_settings_${scopeStoreId}`, next);
+        return next;
+      });
       return;
     }
-    setSettings((prev) => ({ ...prev, [name]: value }));
+    setSettings((prev) => {
+      const next = { ...prev, [name]: value };
+      if (scopeStoreId != null) saveSettingsDraft(`manager_settings_${scopeStoreId}`, next);
+      return next;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -101,7 +120,9 @@ const AdminSettings = () => {
     setSaving(true);
     try {
       await updateSettings(settings, scopeStoreId);
+      clearSettingsDraft(`manager_settings_${scopeStoreId}`);
       toast.success("Paramètres mis à jour avec succès !");
+      await fetchSettings();
     } catch (error) {
       console.error("Erreur sauvegarde:", error);
       toast.error("Erreur lors de la sauvegarde.");
@@ -196,7 +217,11 @@ const AdminSettings = () => {
                   name="telegram_bot_token"
                   value={settings.telegram_bot_token || ""}
                   onChange={handleChange}
-                  placeholder="Ex: 123456789:AAE..."
+                  placeholder={
+                    settings.telegram_bot_token_configured === "true" && !settings.telegram_bot_token
+                      ? "•••••••• (déjà enregistré — laissez vide pour conserver)"
+                      : "Ex: 123456789:AAE..."
+                  }
                   className={`${inputCls} font-mono border-blue-300 dark:border-blue-700`}
                   autoComplete="off"
                 />
@@ -205,6 +230,11 @@ const AdminSettings = () => {
                     Laissez vide pour utiliser le bot commun (paramètres plateforme). Renseignez seulement pour surcharger
                     cette boutique.
                   </p>
+                  {settings.telegram_bot_token_configured === "true" ? (
+                    <p className="font-semibold text-emerald-700 dark:text-emerald-300">
+                      Token boutique déjà enregistré — conservé après redémarrage.
+                    </p>
+                  ) : null}
                   <p className="font-semibold">Comment obtenir le token ?</p>
                   <ol className="list-decimal ml-4 pl-1">
                     <li>Ouvrez Telegram</li>

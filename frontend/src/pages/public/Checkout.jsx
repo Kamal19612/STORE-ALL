@@ -17,7 +17,9 @@ import { submitOrder } from "../../services/orderService";
 import { withShopPrefix } from "../../services/storefrontShopApiPrefix";
 import { toast } from "react-toastify";
 import { getExplicitStoreCode } from "../../services/store/storeContext";
+import { markYengapayCheckoutPending } from "../../utils/pendingYengapayReturn";
 import { useStorefrontBranding } from "../../context/StorefrontBrandingContext";
+import { isCheckoutThemedVitrine } from "../../utils/vitrineTemplate";
 import ProductImage from "../../components/product/ProductImage";
 
 // Instance axios sans intercepteur 401 → pour les appels publics sans token
@@ -47,8 +49,7 @@ publicApi.interceptors.request.use((config) => {
 const Checkout = () => {
   const { storeCode } = useParams();
   const { vitrineTemplate } = useStorefrontBranding();
-  const isThemedCheckout =
-    vitrineTemplate === "alibaba" || vitrineTemplate === "brandsama";
+  const isThemedCheckout = isCheckoutThemedVitrine(vitrineTemplate);
   const { items, clearCart, _hydrated } = useCartStore();
   const navigate = useNavigate();
 
@@ -529,11 +530,15 @@ const Checkout = () => {
     try {
       const response = await submitOrder(payload, items);
       if (response.data?.yengapayCheckoutUrl) {
+        const code = String(storeCode || import.meta.env.VITE_STORE_CODE || "spirit")
+          .trim()
+          .toLowerCase();
         try {
           sessionStorage.setItem(
             `pending_payment_${response.data.orderNumber}`,
-            String(storeCode || ""),
+            code,
           );
+          markYengapayCheckoutPending(response.data.orderNumber, code);
         } catch {
           /* ignore */
         }

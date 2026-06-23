@@ -8,7 +8,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +43,8 @@ import com.storeall.api.notification.NotificationRunner;
 import com.storeall.api.repository.OrderRepository;
 import com.storeall.api.repository.OrderStatusHistoryRepository;
 import com.storeall.api.repository.ProductRepository;
+import com.storeall.api.repository.CustomerPushSubscriptionRepository;
+import com.storeall.api.repository.NotificationOutboxRepository;
 import com.storeall.api.entity.NotificationOutbox;
 import com.storeall.api.tenant.StoreContext;
 import com.storeall.api.util.PdfFieldValuesFormatter;
@@ -78,6 +82,15 @@ public class OrderService {
     private com.storeall.api.repository.DeliveryAssignmentRepository deliveryAssignmentRepository;
 
     @Autowired
+    private NotificationOutboxRepository notificationOutboxRepository;
+
+    @Autowired
+    private CustomerPushSubscriptionRepository customerPushSubscriptionRepository;
+
+    @Autowired
+    private PrivateFileStorageService privateFileStorageService;
+
+    @Autowired
     private NotificationRunner notificationRunner;
 
     @Autowired
@@ -98,9 +111,6 @@ public class OrderService {
     @Autowired(required = false)
     @Lazy
     private FcmService fcmService;
-
-    @Autowired
-    private PrivateFileStorageService privateFileStorageService;
 
     @Autowired
     private YengaPayService yengaPayService;
@@ -346,15 +356,60 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public PaymentStatusResponse getPaymentStatus(String orderNumber) {
-        Order order = orderRepository.findByOrderNumber(orderNumber)
+        Order order = orderRepository.findWithDetailsByOrderNumber(orderNumber)
                 .orElseThrow(() -> new RuntimeException("Commande introuvable"));
+        return toPaymentStatusResponse(order);
+    }
+
+    /**
+     * Retour navigateur YengaPay ({@code yengapay_payment_id} + {@code yengapay_status}).
+     */
+    @Transactional
+    public PaymentStatusResponse resolveYengapayReturn(String paymentId, String statusHint) {
+        Order order = findOrderByYengapayPaymentId(paymentId)
+                .orElseThrow(() -> new RuntimeException("Paiement introuvable"));
+        maybeConfirmYengapayFromReturnHint(order, paymentId, statusHint);
+        return toPaymentStatusResponse(order);
+    }
+
+    private java.util.Optional<Order> findOrderByYengapayPaymentId(String paymentId) {
+        if (paymentId == null || paymentId.isBlank()) {
+            return java.util.Optional.empty();
+        }
+        String id = paymentId.trim();
+        return orderRepository.findWithDetailsByYengapayPaymentIntentId(id)
+                .or(() -> orderRepository.findWithDetailsByYengapayTransactionId(id));
+    }
+
+    private void maybeConfirmYengapayFromReturnHint(Order order, String paymentId, String statusHint) {
+        if (!isSuccessfulYengapayReturnStatus(statusHint)) {
+            return;
+        }
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            return;
+        }
+        confirmYengaPayPayment(order, paymentId);
+    }
+
+    public static boolean isSuccessfulYengapayReturnStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return false;
+        }
+        String s = status.trim().toLowerCase();
+        return "successful".equals(s) || "success".equals(s) || "done".equals(s)
+            || "completed".equals(s) || "paid".equals(s);
+    }
+
+    private PaymentStatusResponse toPaymentStatusResponse(Order order) {
         String whatsappLink = generateWhatsAppLink(order);
+        String storeCode = order.getStore() != null ? order.getStore().getCode() : null;
         return PaymentStatusResponse.builder()
                 .orderNumber(order.getOrderNumber())
                 .orderStatus(order.getStatus().name())
                 .paymentMethod(order.getPaymentMethod() != null ? order.getPaymentMethod().name() : PaymentMethod.COD.name())
                 .paymentStatus(order.getPaymentStatus() != null ? order.getPaymentStatus().name() : PaymentStatus.UNPAID.name())
                 .whatsappLink(whatsappLink)
+                .storeCode(storeCode)
                 .build();
     }
 
@@ -480,11 +535,14 @@ public class OrderService {
     private String generateWhatsAppLink(Order order) {
         StringBuilder message = new StringBuilder();
 
-        // Dynamic Settings with Fallback
-        String storeName = appSettingService.getSettingValue("store_name")
-                .orElse(appProperties.getStoreName() != null ? appProperties.getStoreName() : "STORE");
+        // Dynamic Settings with Fallback (boutique de la commande, pas seulement le tenant HTTP)
+        Long storeId = order.getStore() != null ? order.getStore().getId() : StoreContext.getStoreIdOrNull();
+        String storeName = appSettingService.getSettingValueForStore(storeId, "store_name")
+                .orElse(order.getStore() != null && order.getStore().getName() != null
+                        ? order.getStore().getName()
+                        : (appProperties.getStoreName() != null ? appProperties.getStoreName() : "STORE"));
         String currency = appProperties.getCurrency() != null ? appProperties.getCurrency() : "FCFA";
-        String whatsappNumber = appSettingService.getSettingValue("whatsapp_number")
+        String whatsappNumber = appSettingService.getSettingValueForStore(storeId, "whatsapp_number")
                 .orElse(appProperties.getWhatsappNumber());
         String whatsappDest = formatPhoneNumberForWhatsApp(whatsappNumber);
         if (whatsappDest.isBlank()) {
@@ -504,7 +562,6 @@ public class OrderService {
         message.append("Tel: ").append(order.getCustomerPhone()).append("\n");
         if (pickup) {
             message.append("Mode: *Retrait sur place*\n");
-            Long storeId = order.getStore() != null ? order.getStore().getId() : StoreContext.getStoreIdOrNull();
             String maps = resolveStoreMapsUrl(storeId);
             if (!maps.isBlank()) {
                 message.append("📍 Lieu de retrait: ").append(maps).append("\n");
@@ -1056,13 +1113,81 @@ public class OrderService {
     }
 
     /**
-     * Supprime logiquement une commande (Soft Delete).
+     * Supprime définitivement une commande (base de données + fichiers liés).
      */
     @Transactional
     public void deleteOrder(Long id) {
-        Order order = getOrderById(id);
-        order.setDeleted(true);
-        orderRepository.save(order);
+        getOrderById(id);
+        permanentlyDeleteOrder(id);
+    }
+
+    /**
+     * Suppression définitive d'une commande (super admin, toutes boutiques).
+     */
+    @Transactional
+    public void permanentlyDeleteOrder(Long orderId) {
+        Order order = orderRepository.findByIdWithItems(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Commande introuvable"));
+        permanentlyDeleteOrders(List.of(order));
+    }
+
+    /**
+     * Suppression définitive de toutes les commandes d'une boutique (y compris déjà masquées).
+     */
+    @Transactional
+    public int permanentlyDeleteAllOrdersForStore(Long storeId) {
+        if (storeId == null) {
+            throw new IllegalArgumentException("storeId requis");
+        }
+        if (!storeRepository.existsById(storeId)) {
+            throw new IllegalArgumentException("Boutique introuvable");
+        }
+        List<Order> orders = orderRepository.findAllByStoreIdWithItems(storeId);
+        permanentlyDeleteOrders(orders);
+        return orders.size();
+    }
+
+    private void permanentlyDeleteOrders(List<Order> orders) {
+        if (orders == null || orders.isEmpty()) {
+            return;
+        }
+        List<Long> orderIds = orders.stream().map(Order::getId).filter(Objects::nonNull).toList();
+        List<String> orderNumbers = orders.stream()
+                .map(Order::getOrderNumber)
+                .filter(Objects::nonNull)
+                .filter(n -> !n.isBlank())
+                .toList();
+
+        for (Order order : orders) {
+            restoreOrderStock(order);
+            deleteOrderItemPdfs(order);
+        }
+
+        if (!orderIds.isEmpty()) {
+            notificationOutboxRepository.deleteByOrderIdIn(orderIds);
+            deliveryAssignmentRepository.deleteByOrder_IdIn(orderIds);
+        }
+        if (!orderNumbers.isEmpty()) {
+            customerPushSubscriptionRepository.deleteByOrderNumberIn(orderNumbers);
+        }
+        orderRepository.deleteAll(orders);
+    }
+
+    private void deleteOrderItemPdfs(Order order) {
+        if (order.getItems() == null) {
+            return;
+        }
+        for (OrderItem item : order.getItems()) {
+            String path = item.getFilledPdfUrl();
+            if (path == null || path.isBlank()) {
+                continue;
+            }
+            try {
+                privateFileStorageService.deleteIfExists(path);
+            } catch (Exception ex) {
+                log.warn("PDF commande non supprimé {} : {}", path, ex.getMessage());
+            }
+        }
     }
 
     /**

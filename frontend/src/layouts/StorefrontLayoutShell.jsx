@@ -6,6 +6,7 @@ import AlibabaThemeProvider from "../vitrines/alibaba/AlibabaThemeProvider";
 import AlibabaHeader from "../vitrines/alibaba/components/AlibabaHeader";
 import AlibabaFooter from "../vitrines/alibaba/components/AlibabaFooter";
 import BrandsamaThemeProvider from "../vitrines/brandsama/BrandsamaThemeProvider";
+import ClassicThemeProvider from "../vitrines/classic/ClassicThemeProvider";
 import { BrandsamaCatalogProvider } from "../vitrines/brandsama/BrandsamaCatalogContext";
 import BrandsamaHeader from "../vitrines/brandsama/components/BrandsamaHeader";
 import BrandsamaFooter from "../vitrines/brandsama/components/BrandsamaFooter";
@@ -55,12 +56,14 @@ export default function StorefrontLayoutShell() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <Header />
-      <main className="flex-grow bg-gray-50">
-        <Outlet />
-      </main>
-      <Footer />
-    </div>
+    <ClassicThemeProvider>
+      <div className="flex flex-col min-h-screen">
+        <Header />
+        <main className="flex-grow bg-gray-50">
+          <Outlet />
+        </main>
+        <Footer />
+      </div>
+    </ClassicThemeProvider>
   );
 }

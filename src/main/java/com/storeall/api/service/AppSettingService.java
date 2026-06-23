@@ -13,10 +13,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import com.storeall.api.tenant.StoreContext;
 
@@ -24,6 +26,12 @@ import com.storeall.api.tenant.StoreContext;
 @RequiredArgsConstructor
 @Slf4j
 public class AppSettingService {
+
+    private static final Set<String> PLATFORM_GLOBAL_SETTING_KEYS = Set.of(
+            "telegram_bot_token",
+            "telegram_chat_id",
+            "public_base_url",
+            "telegram_webhook_base_url");
 
     private final AppSettingRepository appSettingRepository;
     private final StoreRepository storeRepository;
@@ -40,6 +48,17 @@ public class AppSettingService {
 
     private static boolean isYengaPayKey(String key) {
         return key != null && key.startsWith("yengapay_");
+    }
+
+    /** Secrets : une valeur vide à l'enregistrement conserve l'existant en base. */
+    private static boolean isPreservedSecretKey(String key) {
+        return "telegram_bot_token".equals(key)
+                || "yengapay_api_key".equals(key)
+                || "yengapay_webhook_secret".equals(key);
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private static boolean isSuperAdmin() {
@@ -203,6 +222,13 @@ public class AppSettingService {
                     .store(com.storeall.api.entity.Store.builder().id(storeId).build())
                     .build());
 
+            Optional<AppSetting> existingRow = setting.getId() != null
+                    ? Optional.of(setting)
+                    : appSettingRepository.findFirstByKeyAndStoreIdOrderByIdAsc(key, storeId);
+            if (shouldPreserveSecretOnBlank(key, value, existingRow)) {
+                continue;
+            }
+
             // Normalisation légère pour éviter des valeurs cassées côté liens WhatsApp.
             if ("whatsapp_number".equals(key)) {
                 setting.setValue(normalizeWhatsAppNumber(value));
@@ -323,11 +349,73 @@ public class AppSettingService {
         Map<String, String> m = new HashMap<>();
         appSettingRepository.findFirstByKeyAndStoreIsNullOrderByIdAsc("telegram_bot_token")
                 .map(AppSetting::getValue)
-                .ifPresent(v -> m.put("telegram_bot_token", v));
+                .filter(AppSettingService::hasText)
+                .ifPresent(v -> m.put("telegram_bot_token_configured", "true"));
         appSettingRepository.findFirstByKeyAndStoreIsNullOrderByIdAsc("telegram_chat_id")
                 .map(AppSetting::getValue)
+                .filter(AppSettingService::hasText)
                 .ifPresent(v -> m.put("telegram_chat_id", v));
+        if (!m.containsKey("telegram_bot_token_configured")) {
+            m.put("telegram_bot_token_configured", "false");
+        }
         return m;
+    }
+
+    /**
+     * Copie les variables d'environnement vers {@code app_settings} globaux si la base est vide.
+     *
+     * @return nombre de clés créées ou mises à jour
+     */
+    @Transactional
+    public int bootstrapGlobalTelegramFromEnvironment(String envBotToken, String envChatId) {
+        int updated = 0;
+        if (hasText(envBotToken)) {
+            var existing = appSettingRepository.findFirstByKeyAndStoreIsNullOrderByIdAsc("telegram_bot_token");
+            if (existing.isEmpty() || !hasText(existing.get().getValue())) {
+                upsertGlobalSettingValue("telegram_bot_token", envBotToken.trim());
+                updated++;
+            }
+        }
+        if (hasText(envChatId)) {
+            var existing = appSettingRepository.findFirstByKeyAndStoreIsNullOrderByIdAsc("telegram_chat_id");
+            if (existing.isEmpty() || !hasText(existing.get().getValue())) {
+                upsertGlobalSettingValue("telegram_chat_id", envChatId.trim());
+                updated++;
+            }
+        }
+        return updated;
+    }
+
+    private void upsertGlobalSettingValue(String key, String value) {
+        AppSetting setting = appSettingRepository.findFirstByKeyAndStoreIsNullOrderByIdAsc(key)
+                .orElse(AppSetting.builder().key(key).build());
+        setting.setStore(null);
+        setting.setValue(value);
+        appSettingRepository.save(setting);
+        dedupeGlobalPlatformKey(key, setting.getId());
+    }
+
+    /** PostgreSQL autorise plusieurs lignes (store_id NULL, key) — on garde une seule entrée globale. */
+    private void dedupeGlobalPlatformKey(String key, Long keepId) {
+        if (key == null || !PLATFORM_GLOBAL_SETTING_KEYS.contains(key)) {
+            return;
+        }
+        for (AppSetting row : appSettingRepository.findAllByKeyAndStoreIsNullOrderByIdAsc(key)) {
+            if (keepId != null && keepId.equals(row.getId())) {
+                continue;
+            }
+            appSettingRepository.delete(row);
+        }
+    }
+
+    private boolean shouldPreserveSecretOnBlank(String key, String incomingValue, Optional<AppSetting> existing) {
+        if (!isPreservedSecretKey(key)) {
+            return false;
+        }
+        if (hasText(incomingValue)) {
+            return false;
+        }
+        return existing.isPresent() && hasText(existing.get().getValue());
     }
 
     /**
@@ -355,7 +443,7 @@ public class AppSettingService {
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    public void cleanupTelegramChatShadowsOnStartup() {
+    public void onApplicationReady() {
         try {
             int n = cleanupStoreTelegramChatShadows();
             if (n > 0) {
@@ -364,6 +452,52 @@ public class AppSettingService {
         } catch (Exception e) {
             log.warn("[telegram] Nettoyage chat boutique au démarrage ignoré : {}", e.toString());
         }
+        try {
+            int repaired = repairMisplacedPlatformGlobalSettings();
+            if (repaired > 0) {
+                log.info("[settings] Démarrage : {} réglage(s) plateforme restauré(s) en global", repaired);
+            }
+        } catch (Exception e) {
+            log.warn("[settings] Réparation réglages plateforme ignorée : {}", e.toString());
+        }
+    }
+
+    /**
+     * Répare les réglages Telegram plateforme déplacés vers une boutique par {@link com.storeall.api.tenant.LegacyStoreDataMigrator}.
+     */
+    @Transactional
+    public int repairMisplacedPlatformGlobalSettings() {
+        int repaired = 0;
+        for (String key : PLATFORM_GLOBAL_SETTING_KEYS) {
+            if (appSettingRepository.findFirstByKeyAndStoreIsNullOrderByIdAsc(key)
+                    .map(AppSetting::getValue)
+                    .filter(AppSettingService::hasText)
+                    .isPresent()) {
+                dedupeGlobalPlatformKey(key, appSettingRepository.findFirstByKeyAndStoreIsNullOrderByIdAsc(key)
+                        .map(AppSetting::getId)
+                        .orElse(null));
+                continue;
+            }
+            Optional<AppSetting> bestStoreScoped = appSettingRepository.findAll().stream()
+                    .filter(s -> key.equals(s.getKey()) && s.getStore() != null && hasText(s.getValue()))
+                    .max(Comparator.comparing(AppSetting::getId));
+            if (bestStoreScoped.isEmpty()) {
+                continue;
+            }
+            AppSetting source = bestStoreScoped.get();
+            upsertGlobalSettingValue(key, source.getValue().trim());
+            log.info(
+                    "[settings] Réglage plateforme {} restauré en global (copié depuis store_id={})",
+                    key,
+                    source.getStore().getId());
+            repaired++;
+        }
+        return repaired;
+    }
+
+    @Transactional
+    public void cleanupTelegramChatShadowsOnStartup() {
+        cleanupStoreTelegramChatShadows();
     }
 
     @Transactional
@@ -377,10 +511,15 @@ public class AppSettingService {
                 continue;
             }
             String value = e.getValue() == null ? "" : e.getValue().trim();
-            AppSetting setting = appSettingRepository.findFirstByKeyAndStoreIsNullOrderByIdAsc(key)
-                    .orElse(AppSetting.builder().key(key).build());
+            Optional<AppSetting> existing = appSettingRepository.findFirstByKeyAndStoreIsNullOrderByIdAsc(key);
+            if (shouldPreserveSecretOnBlank(key, value, existing)) {
+                continue;
+            }
+            AppSetting setting = existing.orElse(AppSetting.builder().key(key).build());
+            setting.setStore(null);
             setting.setValue(value);
             appSettingRepository.save(setting);
+            dedupeGlobalPlatformKey(key, setting.getId());
         }
     }
 

@@ -18,9 +18,11 @@ import useCartStore from "../../store/cartStore";
 import api, { getPublicSettings } from "../../services/api";
 import { submitOrder } from "../../services/orderService";
 import { useStorefrontBranding } from "../../context/StorefrontBrandingContext";
+import { isCheckoutThemedVitrine } from "../../utils/vitrineTemplate";
 import { useStorefrontHref } from "../../hooks/useStorefrontHref";
 import ProductImage from "../../components/product/ProductImage";
 import { resolveStoreMapsUrl } from "../../utils/pickupWhatsApp";
+import { markYengapayCheckoutPending } from "../../utils/pendingYengapayReturn";
 
 const STEPS = {
   CHOICE: "choice",
@@ -35,8 +37,7 @@ const OrderFulfillment = () => {
   const { displayName, vitrineTemplate, storeInfo } = useStorefrontBranding();
   const { items, clearCart, _hydrated } = useCartStore();
 
-  const isThemed =
-    vitrineTemplate === "alibaba" || vitrineTemplate === "brandsama";
+  const isThemed = isCheckoutThemedVitrine(vitrineTemplate);
 
   const shopHome =
     home ||
@@ -88,6 +89,11 @@ const OrderFulfillment = () => {
   }, [settingsLoaded, dialPrefix]);
 
   useEffect(() => {
+    if (!settingsLoaded || !yengapayEnabled) return;
+    setPaymentMethod((prev) => (prev === "COD" ? "YENGAPAY" : prev));
+  }, [settingsLoaded, yengapayEnabled]);
+
+  useEffect(() => {
     if (!_hydrated) return;
     if (items.length === 0 && !orderSuccess) {
       navigate(shopHome);
@@ -128,11 +134,15 @@ const OrderFulfillment = () => {
     try {
       const response = await submitOrder(payload, items);
       if (response.data?.yengapayCheckoutUrl) {
+        const code = String(storeCode || import.meta.env.VITE_STORE_CODE || "spirit")
+          .trim()
+          .toLowerCase();
         try {
           sessionStorage.setItem(
             `pending_payment_${response.data.orderNumber}`,
-            String(storeCode || ""),
+            code,
           );
+          markYengapayCheckoutPending(response.data.orderNumber, code);
         } catch {
           /* ignore */
         }
@@ -349,7 +359,33 @@ const OrderFulfillment = () => {
                   <p className="text-sm font-bold text-gray-700 uppercase tracking-wider">
                     Mode de paiement
                   </p>
-                  <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer">
+                  <label
+                    className={`flex items-start gap-3 p-3 border-2 rounded-xl cursor-pointer transition-colors ${
+                      paymentMethod === "YENGAPAY"
+                        ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                        : "border-gray-200 hover:border-primary/40"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="pickupPaymentMethod"
+                      value="YENGAPAY"
+                      checked={paymentMethod === "YENGAPAY"}
+                      onChange={() => setPaymentMethod("YENGAPAY")}
+                      className="mt-1"
+                    />
+                    <div>
+                      <span className="font-bold text-secondary">Payer maintenant (YengaPay)</span>
+                      <p className="text-xs text-gray-500">Orange Money, Moov, Coris… — recommandé</p>
+                    </div>
+                  </label>
+                  <label
+                    className={`flex items-start gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${
+                      paymentMethod === "COD"
+                        ? "border-secondary/30 bg-gray-50"
+                        : "border-gray-200"
+                    }`}
+                  >
                     <input
                       type="radio"
                       name="pickupPaymentMethod"
@@ -361,20 +397,6 @@ const OrderFulfillment = () => {
                     <div>
                       <span className="font-bold text-secondary">Payer en boutique</span>
                       <p className="text-xs text-gray-500">Espèces ou mobile money au retrait</p>
-                    </div>
-                  </label>
-                  <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer">
-                    <input
-                      type="radio"
-                      name="pickupPaymentMethod"
-                      value="YENGAPAY"
-                      checked={paymentMethod === "YENGAPAY"}
-                      onChange={() => setPaymentMethod("YENGAPAY")}
-                      className="mt-1"
-                    />
-                    <div>
-                      <span className="font-bold text-secondary">Payer maintenant (YengaPay)</span>
-                      <p className="text-xs text-gray-500">Orange Money, Moov, Coris…</p>
                     </div>
                   </label>
                 </div>

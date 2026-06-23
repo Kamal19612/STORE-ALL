@@ -28,6 +28,12 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @EntityGraph(attributePaths = {"items", "items.product", "store"})
     Optional<Order> findWithDetailsByOrderNumber(String orderNumber);
 
+    @EntityGraph(attributePaths = {"items", "items.product", "store"})
+    Optional<Order> findWithDetailsByYengapayPaymentIntentId(String yengapayPaymentIntentId);
+
+    @EntityGraph(attributePaths = {"items", "items.product", "store"})
+    Optional<Order> findWithDetailsByYengapayTransactionId(String yengapayTransactionId);
+
     /**
      * Trouve les commandes ayant l'un des statuts donnés.
      */
@@ -187,4 +193,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     /** Suppression boutique : toutes les commandes du tenant (y compris soft-deleted). */
     List<Order> findByStore_Id(Long storeId);
+
+    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product WHERE o.id = :id")
+    Optional<Order> findByIdWithItems(@Param("id") Long id);
+
+    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product WHERE o.store.id = :storeId")
+    List<Order> findAllByStoreIdWithItems(@Param("storeId") Long storeId);
 }

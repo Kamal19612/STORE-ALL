@@ -111,6 +111,27 @@ public class AdminSupervisionController {
         return ResponseEntity.ok(supervisionService.listOrders(storeId, pageable));
     }
 
+    /**
+     * Suppression définitive d'une commande (super admin, toutes boutiques).
+     */
+    @DeleteMapping("/orders/{orderId}")
+    public ResponseEntity<Void> deleteOrder(@PathVariable Long orderId) {
+        supervisionService.deleteOrderForSupervision(orderId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Supprime définitivement toutes les commandes d'une boutique. Paramètre {@code storeId} obligatoire.
+     */
+    @PostMapping("/orders/clear")
+    public ResponseEntity<Map<String, Object>> clearOrdersForStore(@RequestParam Long storeId) {
+        int deleted = supervisionService.clearOrdersForStore(storeId);
+        return ResponseEntity.ok(Map.of(
+                "message", "Commandes de la boutique supprimées définitivement",
+                "deletedCount", deleted,
+                "storeId", storeId));
+    }
+
     @GetMapping("/products")
     public ResponseEntity<Page<SupervisionProductRow>> listProducts(
             @RequestParam(required = false) Long storeId,

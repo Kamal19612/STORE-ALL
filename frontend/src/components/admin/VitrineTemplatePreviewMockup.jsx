@@ -1,10 +1,15 @@
 /**
  * Maquette statique du rendu vitrine (aperçu admin, pas la vraie page).
  */
-export function DefaultVitrineMockup({ storeName, logoUrl }) {
+export function DefaultVitrineMockup({ storeName, logoUrl, primaryColor, secondaryColor }) {
+  const primary = primaryColor && /^#[0-9A-Fa-f]{6}$/.test(primaryColor) ? primaryColor : "#f5ad41";
+  const secondary = secondaryColor && /^#[0-9A-Fa-f]{6}$/.test(secondaryColor) ? secondaryColor : "#242021";
   return (
     <div className="h-full flex flex-col bg-gray-100 text-[10px] leading-tight">
-      <header className="flex items-center justify-between px-3 py-2 bg-[#242021] text-white shrink-0">
+      <header
+        className="flex items-center justify-between px-3 py-2 text-white shrink-0"
+        style={{ backgroundColor: secondary }}
+      >
         <div className="flex items-center gap-1.5 min-w-0">
           {logoUrl ? (
             <img src={logoUrl} alt="" className="h-5 max-w-[72px] object-contain" />
@@ -12,20 +17,35 @@ export function DefaultVitrineMockup({ storeName, logoUrl }) {
             <span className="font-bold truncate">{storeName || "Boutique"}</span>
           )}
         </div>
-        <span className="shrink-0 rounded-md bg-[#f5ad41] text-[#242021] px-2 py-0.5 font-bold">🛒 2</span>
+        <span className="shrink-0 rounded-md px-2 py-0.5 font-bold" style={{ backgroundColor: primary, color: secondary }}>
+          🛒 2
+        </span>
       </header>
       <div className="flex-1 p-2 space-y-2 overflow-hidden">
-        <div className="h-8 rounded-lg bg-gradient-to-r from-[#f5ad41]/40 to-[#242021]/20 border border-[#f5ad41]/30" />
+        <div
+          className="h-8 rounded-lg border"
+          style={{
+            background: `linear-gradient(to right, ${primary}66, ${secondary}33)`,
+            borderColor: `${primary}4d`,
+          }}
+        />
         <div className="grid grid-cols-2 gap-1.5">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200/80">
               <div className="aspect-[4/3] bg-gray-200" />
               <div className="p-1.5">
-                <div className="h-1.5 w-8 bg-[#f5ad41]/30 rounded mb-1" />
+                <div className="h-1.5 w-8 rounded mb-1" style={{ backgroundColor: `${primary}4d` }} />
                 <div className="h-2 w-full bg-gray-300 rounded mb-1" />
                 <div className="flex justify-between items-center">
-                  <span className="font-bold text-[#f5ad41] text-[9px]">12 000 F</span>
-                  <span className="rounded-md bg-[#f5ad41] text-[#242021] px-1 py-0.5 text-[8px] font-bold">+</span>
+                  <span className="font-bold text-[9px]" style={{ color: primary }}>
+                    12 000 F
+                  </span>
+                  <span
+                    className="rounded-md px-1 py-0.5 text-[8px] font-bold"
+                    style={{ backgroundColor: primary, color: secondary }}
+                  >
+                    +
+                  </span>
                 </div>
               </div>
             </div>

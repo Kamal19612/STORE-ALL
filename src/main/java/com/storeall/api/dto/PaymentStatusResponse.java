@@ -11,4 +11,5 @@ public class PaymentStatusResponse {
   private String paymentMethod;
   private String paymentStatus;
   private String whatsappLink;
+  private String storeCode;
 }

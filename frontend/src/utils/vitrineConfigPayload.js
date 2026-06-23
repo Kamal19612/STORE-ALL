@@ -1,8 +1,28 @@
+import { CLASSIC_THEME_DEFAULT, getClassicTheme } from "../config/classicThemes";
+
 /**
  * Construit le JSON {@code vitrine_config} envoyé à l’API selon le modèle choisi.
  */
 export function buildVitrineConfigForApi(templateId, fields = {}) {
   const slug = (templateId && String(templateId).trim().toLowerCase()) || "default";
+
+  if (slug === "default") {
+    const themeId = (fields.themeId && String(fields.themeId).trim().toLowerCase()) || CLASSIC_THEME_DEFAULT;
+    const preset = getClassicTheme(themeId);
+    const primaryRaw = fields.primaryColor?.trim();
+    const secondaryRaw = fields.secondaryColor?.trim();
+    const primary =
+      primaryRaw && /^#[0-9A-Fa-f]{6}$/.test(primaryRaw) ? primaryRaw : preset.primaryColor;
+    const secondary =
+      secondaryRaw && /^#[0-9A-Fa-f]{6}$/.test(secondaryRaw) ? secondaryRaw : preset.secondaryColor;
+
+    return {
+      themeId,
+      primaryColor: primary,
+      secondaryColor: secondary,
+    };
+  }
+
   if (slug !== "alibaba" && slug !== "brandsama") {
     return undefined;
   }
@@ -40,6 +60,26 @@ export function readAlibabaFieldsFromStore(store) {
     showSearch: cfg.showSearch !== false,
     showFeaturedStrip: cfg.showFeaturedStrip !== false,
     accentColor: typeof cfg.accentColor === "string" ? cfg.accentColor : "",
+  };
+}
+
+export function readClassicFieldsFromStore(store) {
+  const cfg = store?.vitrineConfig && typeof store.vitrineConfig === "object" ? store.vitrineConfig : {};
+  const themeId =
+    typeof cfg.themeId === "string" && cfg.themeId.trim()
+      ? cfg.themeId.trim().toLowerCase()
+      : CLASSIC_THEME_DEFAULT;
+  const preset = getClassicTheme(themeId);
+  return {
+    themeId,
+    primaryColor:
+      typeof cfg.primaryColor === "string" && /^#[0-9A-Fa-f]{6}$/.test(cfg.primaryColor.trim())
+        ? cfg.primaryColor.trim()
+        : preset.primaryColor,
+    secondaryColor:
+      typeof cfg.secondaryColor === "string" && /^#[0-9A-Fa-f]{6}$/.test(cfg.secondaryColor.trim())
+        ? cfg.secondaryColor.trim()
+        : preset.secondaryColor,
   };
 }
 

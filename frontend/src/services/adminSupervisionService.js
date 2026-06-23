@@ -57,6 +57,16 @@ export function listSuperOrders({ page = 0, size = 20, storeId } = {}) {
   return api.get("/super/orders", { params }).then((r) => r.data);
 }
 
+/** Suppression définitive d'une commande (super admin). */
+export function deleteSuperOrder(orderId) {
+  return api.delete(`/super/orders/${orderId}`).then(() => undefined);
+}
+
+/** Supprime définitivement toutes les commandes d'une boutique (storeId obligatoire). */
+export function clearSuperStoreOrders(storeId) {
+  return api.post("/super/orders/clear", {}, { params: { storeId } }).then((r) => r.data);
+}
+
 /** Produits toutes boutiques ou filtre. */
 export function listSuperProducts({ page = 0, size = 20, storeId, search = "" } = {}) {
   const params = { page, size, sort: "id,desc", search: search || undefined };

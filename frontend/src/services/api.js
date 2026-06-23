@@ -122,4 +122,12 @@ export const sendTelegramTest = (text, managerStoreId) =>
 export const getPaymentStatus = (orderNumber) =>
   api.get(`/public/payments/status/${encodeURIComponent(orderNumber)}`);
 
+export const resolveYengapayReturn = (paymentId, status) =>
+  api.get("/public/payments/yengapay/resolve", {
+    params: {
+      yengapay_payment_id: paymentId,
+      ...(status ? { yengapay_status: status } : {}),
+    },
+  });
+
 export default api;

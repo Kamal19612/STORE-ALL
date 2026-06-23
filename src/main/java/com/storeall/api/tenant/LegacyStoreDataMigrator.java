@@ -146,6 +146,13 @@ public class LegacyStoreDataMigrator implements ApplicationRunner {
         return count;
     }
 
+    /** Clés réservées au niveau plateforme (store_id NULL) — ne pas rattacher à une boutique. */
+    private static final java.util.Set<String> PLATFORM_GLOBAL_SETTING_KEYS = java.util.Set.of(
+            "telegram_bot_token",
+            "telegram_chat_id",
+            "public_base_url",
+            "telegram_webhook_base_url");
+
     private long attachAppSettings(Store store) {
         long attached = 0;
         long removedOrphans = 0;
@@ -154,6 +161,9 @@ public class LegacyStoreDataMigrator implements ApplicationRunner {
                 continue;
             }
             String key = x.getKey();
+            if (key != null && PLATFORM_GLOBAL_SETTING_KEYS.contains(key)) {
+                continue;
+            }
             if (appSettingRepository.findFirstByKeyAndStoreIdOrderByIdAsc(key, store.getId()).isPresent()) {
                 appSettingRepository.delete(x);
                 removedOrphans++;

@@ -46,11 +46,20 @@ app:
     seed-delivery-settings-on-start: true
     delivery-settings-store-code: ${STORE_ALL_DELIVERY_STORE_CODE:spirit}
 
+  public:
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+    chat-id: ${TELEGRAM_CHAT_ID:}
+    webhook-url: ${TELEGRAM_WEBHOOK_URL:}
+    webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:}
+
   telegram:
     bot-token: ${TELEGRAM_BOT_TOKEN:}
     chat-id: ${TELEGRAM_CHAT_ID:}
     webhook-url: ${TELEGRAM_WEBHOOK_URL:}
     webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:}
+
+  # URL publique du site vitrine (retour YengaPay → WhatsApp). Ex. https://store.socialracine.com
+  public-base-url: ${APP_PUBLIC_URL:https://store.socialracine.com}
 
   webpush:
     vapid-public-key: ${WEBPUSH_VAPID_PUBLIC_KEY:}
