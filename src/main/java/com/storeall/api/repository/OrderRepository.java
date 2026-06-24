@@ -136,13 +136,14 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      * Trouve les commandes assignées à un livreur spécifique avec certains
      * statuts.
      */
-    @EntityGraph(attributePaths = {"store"})
+    @EntityGraph(attributePaths = {"store", "deliveryAgent"})
     Page<Order> findByDeliveryAgentUsernameAndStatusInAndDeletedFalse(
         String username, List<Order.Status> statuses, Pageable pageable);
 
     /**
      * Trouve toutes les commandes non supprimées (soft delete).
      */
+    @EntityGraph(attributePaths = {"store", "deliveryAgent"})
     Page<Order> findByDeletedFalse(Pageable pageable);
 
     /** Super admin : toutes les commandes ou filtre {@code storeId}. */
@@ -150,6 +151,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Page<Order> findSupervisionPage(@Param("storeId") Long storeId, Pageable pageable);
 
     // Multi-store scoped
+    @EntityGraph(attributePaths = {"store", "deliveryAgent"})
     Page<Order> findByDeletedFalseAndStoreId(Long storeId, Pageable pageable);
     Optional<Order> findByIdAndStoreId(Long id, Long storeId);
 
@@ -160,7 +162,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Page<Order> findByStatusAndDeliveryAgentNullAndDeletedFalseAndStore_Id(
         Order.Status status, Long storeId, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"store"})
+    @EntityGraph(attributePaths = {"store", "deliveryAgent"})
     Page<Order> findByDeliveryAgentUsernameAndStatusInAndDeletedFalseAndStore_Id(
         String username, List<Order.Status> statuses, Long storeId, Pageable pageable);
 

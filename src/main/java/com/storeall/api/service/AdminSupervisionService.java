@@ -309,16 +309,30 @@ public class AdminSupervisionService {
         Long sid = s != null ? s.getId() : null;
         String sc = s != null ? s.getCode() : null;
         String sn = s != null ? s.getName() : null;
+        User agent = o.getDeliveryAgent();
+        java.util.Map<String, Object> agentMap = null;
+        if (agent != null) {
+            agentMap = new java.util.LinkedHashMap<>();
+            agentMap.put("id", agent.getId());
+            agentMap.put("username", agent.getUsername());
+            if (agent.getRole() != null) {
+                agentMap.put("role", agent.getRole().name());
+            }
+        }
         return SupervisionOrderRow.builder()
                 .id(o.getId())
                 .orderNumber(o.getOrderNumber())
                 .status(o.getStatus())
                 .total(o.getTotal())
+                .deliveryCost(o.getDeliveryCost())
+                .deliveryType(o.getDeliveryType())
                 .createdAt(o.getCreatedAt())
+                .updatedAt(o.getUpdatedAt())
                 .customerName(o.getCustomerName())
                 .storeId(sid)
                 .storeCode(sc)
                 .storeName(sn)
+                .deliveryAgent(agentMap)
                 .build();
     }
 
